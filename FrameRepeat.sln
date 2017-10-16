@@ -26,6 +26,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
+		VisualSVNWorkingCopyRoot = ..\..\..\Documents\Visual Studio 2017\Projects\refactorerl
 		SolutionGuid = {AA64097C-6C1C-426B-BCC8-1FEE25EA6E77}
 	EndGlobalSection
 EndGlobal

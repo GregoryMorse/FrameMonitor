@@ -97,8 +97,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>C:\Users\Gregory\Documents\my libraries\opencv.new\build\x86\vc15st\lib\;C:\Users\Gregory\Documents\my libraries\opencv330\opencv\build\x86\vc15st\3rdparty\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_core330d.lib;opencv_imgcodecs330d.lib;opencv_imgproc330d.lib;opencv_video330d.lib;opencv_videoio330d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;C:\Users\Gregory\Documents\my libraries\opencv330\opencv\build\x86\vc15st\3rdparty\ippicv\ippicv_win\lib\ia32\ippicvmt.lib;C:\Users\Gregory\Documents\my libraries\opencv330\opencv\build\x86\vc15st\3rdparty\ippicv\ippiw_win\lib\ia32\ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Gregory\Documents\my libraries\opencv.new\build\x86\vc15st\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_core330d.lib;opencv_imgcodecs330d.lib;opencv_imgproc330d.lib;opencv_video330d.lib;opencv_videoio330d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -125,6 +125,8 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>opencv_core330d.lib;opencv_imgcodecs330d.lib;opencv_imgproc330d.lib;opencv_video330d.lib;opencv_videoio330d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Gregory\Documents\my libraries\opencv.new\build\x64\vc15st\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -136,6 +138,9 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
+    <PostBuildEvent>
+      <Command>copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15st\bin\opencv_ffmpeg330_64.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -152,6 +157,8 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>opencv_core330.lib;opencv_imgcodecs330.lib;opencv_imgproc330.lib;opencv_video330.lib;opencv_videoio330.lib;ittnotify.lib;libjasper.lib;libjpeg.lib;libpng.lib;libtiff.lib;libwebp.lib;zlib.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Gregory\Documents\my libraries\opencv.new\build\x86\vc15st\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -163,6 +170,9 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
+    <PostBuildEvent>
+      <Command>copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x86\vc15st\bin\opencv_ffmpeg330.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -179,6 +189,8 @@
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>opencv_core330.lib;opencv_imgcodecs330.lib;opencv_imgproc330.lib;opencv_video330.lib;opencv_videoio330.lib;ittnotify.lib;libjasper.lib;libjpeg.lib;libpng.lib;libtiff.lib;libwebp.lib;zlib.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\Gregory\Documents\my libraries\opencv.new\build\x64\vc15st\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -190,6 +202,9 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
+    <PostBuildEvent>
+      <Command>copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15st\bin\opencv_ffmpeg330_64.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
