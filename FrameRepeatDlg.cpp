@@ -59,10 +59,11 @@ CFrameRepeatDlg::CFrameRepeatDlg(CWnd* pParent /*=NULL*/)
 void CFrameRepeatDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
-	DDX_Control(pDX, IDC_TIMELINE, m_timelineStatic);
+	/*DDX_Control(pDX, IDC_TIMELINE, m_timelineStatic);
 	DDX_Control(pDX, IDC_VIDEOIMG, m_VideoImg);
 	DDX_Control(pDX, IDC_BKGNDIMG, m_BkgndImg);
-	DDX_Control(pDX, IDC_FGNDIMG, m_FgndImg);
+	DDX_Control(pDX, IDC_FGNDIMG, m_FgndImg);*/
+	DDX_Control(pDX, IDC_MAINTAB, m_MainTab);
 }
 
 BEGIN_MESSAGE_MAP(CFrameRepeatDlg, CDialogEx)
@@ -73,6 +74,8 @@ BEGIN_MESSAGE_MAP(CFrameRepeatDlg, CDialogEx)
 	ON_MESSAGE(WM_CUSTOM_MOVEVIDEO, &CFrameRepeatDlg::OnCustomMovevideo)
 	ON_MESSAGE(WM_CUSTOM_OPENVIDCOMPLETE, &CFrameRepeatDlg::OnCustomOpenVidComplete)
 	ON_WM_DESTROY()
+	ON_WM_SIZE()
+	ON_NOTIFY(TCN_SELCHANGE, IDC_MAINTAB, &CFrameRepeatDlg::OnTcnSelchangeMaintab)
 END_MESSAGE_MAP()
 
 
@@ -81,6 +84,13 @@ END_MESSAGE_MAP()
 BOOL CFrameRepeatDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
+	m_BkgndImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ 234 * 3 / 2,20 * 3 / 2,234 * 3 / 2 +15 * 3 / 2,20 * 3 / 2 +13 * 3 / 2 }, this, IDC_BKGNDIMG);
+	m_FgndImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ 234 * 3 / 2,100 * 3 / 2,234 * 3 / 2 +15 * 3 / 2,100 * 3 / 2 +13 * 3 / 2 }, this, IDC_FGNDIMG);
+	m_VideoImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ 10 * 3 / 2,22 * 3 / 2,10 * 3 / 2 +15 * 3 / 2,22 * 3 / 2 +13 * 3 / 2 }, this, IDC_VIDEOIMG);
+	m_timelineStatic.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_NOTIFY, RECT{ 9 * 3 / 2,172 * 3 / 2,9 * 3 / 2 +251 * 3 / 2,172 * 3 / 2 +19 * 3 / 2 }, this, IDC_TIMELINE);
+	m_timelineStatic.SetFont(GetFont());
+	m_OpenBtn.Create(_T("&Open Video"), WS_VISIBLE | WS_CHILD, RECT{ 263 * 3 / 2, 177 * 3 / 2, 263 * 3 / 2 +47 * 3 / 2, 177 * 3 / 2 +15 * 3 / 2 }, this, IDC_OPENVIDEO);
+	m_OpenBtn.SetFont(GetFont());
 
 	// Add "About..." menu item to system menu.
 
@@ -162,7 +172,7 @@ HCURSOR CFrameRepeatDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-static TCHAR BASED_CODE szFilter[] = _T("Videos (*.mp4;*.avi)|*.mp4; *.avi||");
+static TCHAR BASED_CODE szFilter[] = _T("Videos (*.mp4;*.avi;*.mts)|*.mp4; *.avi; *.mts||");
 
 static UINT VideoProcessor(LPVOID pParam)
 {
@@ -254,4 +264,19 @@ void CFrameRepeatDlg::OnDestroy()
 	m_pWorkThread = NULL;
 	VideoCleanup(m_vc);
 	m_vc = NULL;
+}
+
+
+void CFrameRepeatDlg::OnSize(UINT nType, int cx, int cy)
+{
+	CDialogEx::OnSize(nType, cx, cy);
+
+	// TODO: Add your message handler code here
+}
+
+
+void CFrameRepeatDlg::OnTcnSelchangeMaintab(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	// TODO: Add your control notification handler code here
+	*pResult = 0;
 }

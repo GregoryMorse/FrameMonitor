@@ -5,6 +5,7 @@
 #pragma once
 #include "afxwin.h"
 #include "TimelineStatic.h"
+#include "afxcmn.h"
 
 #define WM_CUSTOM_OPENVIDCOMPLETE WM_USER + 1
 
@@ -42,8 +43,12 @@ public:
 	CTimelineStatic m_timelineStatic;
 	LPVOID m_vc;
 	CString m_curFile;
+	CButton m_OpenBtn;
 	CStatic m_VideoImg;
 	CStatic m_BkgndImg;
 	CStatic m_FgndImg;
 	afx_msg void OnDestroy();
+	afx_msg void OnSize(UINT nType, int cx, int cy);
+	CTabCtrl m_MainTab;
+	afx_msg void OnTcnSelchangeMaintab(NMHDR *pNMHDR, LRESULT *pResult);
 };
