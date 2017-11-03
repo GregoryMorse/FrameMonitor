@@ -11,10 +11,10 @@
 #define IDC_VIDEOIMG                    1001
 #define IDC_TIMELINE                    1002
 #define IDC_BKGNDIMG                    1003
-#define IDC_VIDEOIMG3                   1004
 #define IDC_FGNDIMG                     1004
 #define IDC_MAINTAB                     1005
-#define IDC_LIST1                       1006
+#define IDC_PROGRESS                    1006
+#define IDC_PROGTEXT                    1007
 
 // Next default values for new objects
 // 

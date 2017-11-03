@@ -93,12 +93,12 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Users\Gregory\Documents\My Libraries\opencv331\opencv\build\include\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Gregory\Documents\My Libraries\opencv331\opencv\build\include\;C:\Users\Gregory\Documents\My Libraries\opencv_contrib331\modules\xfeatures2d\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalLibraryDirectories>C:\Users\Gregory\Documents\my libraries\opencv.new\build\x86\vc15std\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_core331d.lib;opencv_imgcodecs331d.lib;opencv_imgproc331d.lib;opencv_video331d.lib;opencv_videoio331d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_xfeatures2d331d.lib;opencv_features2d331d.lib;opencv_flann331d.lib;opencv_core331d.lib;opencv_imgcodecs331d.lib;opencv_imgproc331d.lib;opencv_video331d.lib;opencv_videoio331d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -112,7 +112,8 @@
     </ResourceCompile>
     <PostBuildEvent>
       <Command>copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*331d.dll" "$(OutDir)"
-copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg331.dll" "$(OutDir)"</Command>
+copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg331.dll" "$(OutDir)"
+copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*331d.pdb" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -122,11 +123,11 @@ copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\o
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Users\Gregory\Documents\My Libraries\opencv331\opencv\build\include\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Gregory\Documents\My Libraries\opencv331\opencv\build\include\;C:\Users\Gregory\Documents\My Libraries\opencv_contrib331\modules\xfeatures2d\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>opencv_core331d.lib;opencv_imgcodecs331d.lib;opencv_imgproc331d.lib;opencv_video331d.lib;opencv_videoio331d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_xfeatures2d331d.lib;opencv_features2d331d.lib;opencv_flann331d.lib;opencv_core331d.lib;opencv_imgcodecs331d.lib;opencv_imgproc331d.lib;opencv_video331d.lib;opencv_videoio331d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\Users\Gregory\Documents\my libraries\opencv.new\build\x64\vc15std\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
@@ -141,7 +142,8 @@ copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\o
     </ResourceCompile>
     <PostBuildEvent>
       <Command>copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*331d.dll" "$(OutDir)"
-copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg331_64.dll" "$(OutDir)"</Command>
+copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg331_64.dll" "$(OutDir)"
+copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*331d.pdb" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -153,7 +155,7 @@ copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\o
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Users\Gregory\Documents\My Libraries\opencv331\opencv\build\include\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Gregory\Documents\My Libraries\opencv331\opencv\build\include\;C:\Users\Gregory\Documents\My Libraries\opencv_contrib331\modules\xfeatures2d\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -186,7 +188,7 @@ copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\o
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Users\Gregory\Documents\My Libraries\opencv331\opencv\build\include\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Gregory\Documents\My Libraries\opencv331\opencv\build\include\;C:\Users\Gregory\Documents\My Libraries\opencv_contrib331\modules\xfeatures2d\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

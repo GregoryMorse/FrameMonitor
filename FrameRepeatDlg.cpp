@@ -73,9 +73,11 @@ BEGIN_MESSAGE_MAP(CFrameRepeatDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_OPENVIDEO, &CFrameRepeatDlg::OnBnClickedOpenvideo)
 	ON_MESSAGE(WM_CUSTOM_MOVEVIDEO, &CFrameRepeatDlg::OnCustomMovevideo)
 	ON_MESSAGE(WM_CUSTOM_OPENVIDCOMPLETE, &CFrameRepeatDlg::OnCustomOpenVidComplete)
+	ON_MESSAGE(WM_CUSTOM_OPENPROGRESS, &CFrameRepeatDlg::OnCustomOpenProgress)
 	ON_WM_DESTROY()
 	ON_WM_SIZE()
 	ON_NOTIFY(TCN_SELCHANGE, IDC_MAINTAB, &CFrameRepeatDlg::OnTcnSelchangeMaintab)
+	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
 
@@ -84,12 +86,14 @@ END_MESSAGE_MAP()
 BOOL CFrameRepeatDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
-	m_BkgndImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ 234 * 3 / 2,20 * 3 / 2,234 * 3 / 2 +15 * 3 / 2,20 * 3 / 2 +13 * 3 / 2 }, this, IDC_BKGNDIMG);
-	m_FgndImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ 234 * 3 / 2,100 * 3 / 2,234 * 3 / 2 +15 * 3 / 2,100 * 3 / 2 +13 * 3 / 2 }, this, IDC_FGNDIMG);
-	m_VideoImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ 10 * 3 / 2,22 * 3 / 2,10 * 3 / 2 +15 * 3 / 2,22 * 3 / 2 +13 * 3 / 2 }, this, IDC_VIDEOIMG);
-	m_timelineStatic.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_NOTIFY, RECT{ 9 * 3 / 2,172 * 3 / 2,9 * 3 / 2 +251 * 3 / 2,172 * 3 / 2 +19 * 3 / 2 }, this, IDC_TIMELINE);
+	m_MainTab.SetExtendedStyle(m_MainTab.GetExtendedStyle() | WS_EX_CONTROLPARENT);
+	RECT rect;
+	GetClientRect(&rect);
+	m_Progress.Create(WS_VISIBLE | WS_CHILD | PBS_SMOOTH, RECT{ rect.left + 10, rect.top + 10, rect.right - 10, rect.top + 10 + 50 }, this, IDC_PROGRESS);
+	m_ProgText.Create(_T("Waiting for video..."), WS_VISIBLE | WS_CHILD | SS_CENTER, RECT{ rect.left + 10, rect.top + 10 + 60, rect.right - 10, rect.bottom - 80 }, this, IDC_PROGTEXT);
+	m_timelineStatic.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_NOTIFY, RECT{ rect.left + 10, rect.bottom - 70, 10 + 320, rect.bottom - 10 }, this, IDC_TIMELINE);
+	m_OpenBtn.Create(_T("&Open Video"), WS_VISIBLE | WS_CHILD, RECT{ rect.right - 130, rect.bottom - 70, rect.right - 10, rect.bottom - 10 }, this, IDC_OPENVIDEO);
 	m_timelineStatic.SetFont(GetFont());
-	m_OpenBtn.Create(_T("&Open Video"), WS_VISIBLE | WS_CHILD, RECT{ 263 * 3 / 2, 177 * 3 / 2, 263 * 3 / 2 +47 * 3 / 2, 177 * 3 / 2 +15 * 3 / 2 }, this, IDC_OPENVIDEO);
 	m_OpenBtn.SetFont(GetFont());
 
 	// Add "About..." menu item to system menu.
@@ -177,7 +181,9 @@ static TCHAR BASED_CODE szFilter[] = _T("Videos (*.mp4;*.avi;*.mts)|*.mp4; *.avi
 static UINT VideoProcessor(LPVOID pParam)
 {
 	CFrameRepeatDlg* pfrd = (CFrameRepeatDlg*)pParam;
-	ProcessVideo(pfrd->m_curFile, pfrd->m_vc, pfrd->m_timelineStatic.m_motionDetected, pfrd->m_timelineStatic.m_dMaxContourSize);
+	ProcessVideo(pfrd->m_curFile, pfrd->m_vc, pfrd->m_timelineStatic.m_motionDetected, pfrd->m_timelineStatic.m_oscillation,
+		pfrd->m_timelineStatic.m_dMaxContourSize, pfrd->m_timelineStatic.m_dMaxOscillation,
+		std::move(std::function<ProgressFunc>([pfrd](int Frame, int TotalFrames) -> void { pfrd->PostMessage(WM_CUSTOM_OPENPROGRESS, Frame, TotalFrames); })), &pfrd->bExit);
 	pfrd->PostMessageW(WM_CUSTOM_OPENVIDCOMPLETE, 0, 0);
 	pfrd->PostMessageW(WM_CUSTOM_MOVEVIDEO, 0, 0);
 	return 0;
@@ -201,11 +207,32 @@ void CFrameRepeatDlg::OnBnClickedOpenvideo()
 		m_timelineStatic.m_motionDetected.clear();
 		m_timelineStatic.m_dMaxContourSize = 0;
 		m_curFile = dlgFile.GetPathName();
+		if (m_BkgndImg.GetSafeHwnd() != NULL) m_BkgndImg.DestroyWindow();
+		if (m_FgndImg.GetSafeHwnd() != NULL) m_FgndImg.DestroyWindow();
+		if (m_VideoImg.GetSafeHwnd() != NULL) m_VideoImg.DestroyWindow();
+		RECT rect;
+		GetClientRect(&rect);
+		m_OpenTime = time(NULL);
+		if (m_Progress.GetSafeHwnd() == NULL) m_Progress.Create(WS_VISIBLE | WS_CHILD | PBS_SMOOTH, RECT{ rect.left + 10, rect.top + 10, rect.right - 10, rect.top + 10 + 50 }, this, IDC_PROGRESS);
+		if (m_ProgText.GetSafeHwnd() == NULL) m_ProgText.Create(_T("Waiting for video..."), WS_VISIBLE | WS_CHILD | SS_CENTER, RECT{ rect.left + 10, rect.top + 10 + 60, rect.right - 10, rect.bottom - 80 }, this, IDC_PROGTEXT);
 		m_pWorkThread = AfxBeginThread(VideoProcessor, this, 0, CREATE_SUSPENDED, NULL);
 		m_pWorkThread->m_bAutoDelete = FALSE; //cannot determine if it terminated otherwise...
 		m_pWorkThread->ResumeThread();
 	}
-	// TODO: Add your control notification handler code here
+}
+
+afx_msg LRESULT CFrameRepeatDlg::OnCustomOpenProgress(WPARAM wParam, LPARAM lParam)
+{
+	if (m_Progress.GetSafeHwnd() != NULL) {
+		m_Progress.SetPos(wParam);
+		m_Progress.SetRange32(0, lParam);
+	}
+	if (m_ProgText.GetSafeHwnd() != NULL) {
+		TCHAR buf[1024];
+		_stprintf(buf, _T("%lu out of %lu (%lu seconds elapsed, %.02f FPS)\nApproximately %.00f seconds remaining"), (unsigned long)wParam, (unsigned long)lParam, (unsigned long)(time(NULL) - m_OpenTime), (time(NULL) == m_OpenTime) ? (double)wParam : ((double)wParam / (time(NULL) - m_OpenTime)), (time(NULL) == m_OpenTime) ? (double)0 : ((lParam - wParam) * (time(NULL) - m_OpenTime) / (double)wParam));
+		m_ProgText.SetWindowTextW(buf);
+	}
+	return 0;
 }
 
 afx_msg LRESULT CFrameRepeatDlg::OnCustomOpenVidComplete(WPARAM wParam, LPARAM lParam)
@@ -213,6 +240,14 @@ afx_msg LRESULT CFrameRepeatDlg::OnCustomOpenVidComplete(WPARAM wParam, LPARAM l
 	WaitForSingleObject(m_pWorkThread, INFINITE);
 	delete m_pWorkThread;
 	m_pWorkThread = NULL;
+	m_Progress.DestroyWindow();
+	m_ProgText.DestroyWindow();
+	RECT rect;
+	GetClientRect(&rect);
+	m_BkgndImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ rect.right - 130, rect.top + 10, rect.right - 10, rect.top + 10 + 130 }, this, IDC_BKGNDIMG);
+	m_FgndImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ rect.right - 130, rect.top + 150, rect.right - 10, rect.bottom - 80 }, this, IDC_FGNDIMG);
+	m_VideoImg.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_BITMAP, RECT{ rect.left + 10, rect.top + 10, rect.right - 140, rect.bottom - 80 }, this, IDC_VIDEOIMG);
+	OnCustomMovevideo(0, 0);
 	m_timelineStatic.Invalidate();
 	return 0;
 }
@@ -242,16 +277,18 @@ HBITMAP ScaleBitmap(HBITMAP hBitmap, CWnd* wnd)
 
 afx_msg LRESULT CFrameRepeatDlg::OnCustomMovevideo(WPARAM wParam, LPARAM lParam)
 {
-	HBITMAP hBackground, hForeground, hBitmap = GetVideoFrameAdapt(m_vc, lParam, hBackground, hForeground);
+	if (m_vc != NULL) {
+		HBITMAP hBackground, hForeground, hBitmap = GetVideoFrameAdapt(m_vc, lParam, hBackground, hForeground, NULL, &bExit);
 
-	hBitmap = m_VideoImg.SetBitmap(ScaleBitmap(hBitmap, &m_VideoImg));
-	if (hBitmap != NULL) DeleteObject(hBitmap);
+		hBitmap = m_VideoImg.SetBitmap(ScaleBitmap(hBitmap, &m_VideoImg));
+		if (hBitmap != NULL) DeleteObject(hBitmap);
 
-	hForeground = m_FgndImg.SetBitmap(ScaleBitmap(hForeground, &m_FgndImg));
-	if (hForeground != NULL) DeleteObject(hForeground);
+		hForeground = m_FgndImg.SetBitmap(ScaleBitmap(hForeground, &m_FgndImg));
+		if (hForeground != NULL) DeleteObject(hForeground);
 
-	hBackground = m_BkgndImg.SetBitmap(ScaleBitmap(hBackground, &m_BkgndImg));
-	if (hBackground != NULL) DeleteObject(hBackground);
+		hBackground = m_BkgndImg.SetBitmap(ScaleBitmap(hBackground, &m_BkgndImg));
+		if (hBackground != NULL) DeleteObject(hBackground);
+	}
 	return 0;
 }
 
@@ -259,9 +296,11 @@ afx_msg LRESULT CFrameRepeatDlg::OnCustomMovevideo(WPARAM wParam, LPARAM lParam)
 void CFrameRepeatDlg::OnDestroy()
 {
 	CDialogEx::OnDestroy();
-	WaitForSingleObject(m_pWorkThread, INFINITE);
-	delete m_pWorkThread;
-	m_pWorkThread = NULL;
+	if (m_pWorkThread != NULL) {
+		WaitForSingleObject(m_pWorkThread, INFINITE);
+		delete m_pWorkThread;
+		m_pWorkThread = NULL;
+	}
 	VideoCleanup(m_vc);
 	m_vc = NULL;
 }
@@ -271,7 +310,32 @@ void CFrameRepeatDlg::OnSize(UINT nType, int cx, int cy)
 {
 	CDialogEx::OnSize(nType, cx, cy);
 
-	// TODO: Add your message handler code here
+	RECT rect;
+	GetClientRect(&rect);
+	if (m_MainTab.GetSafeHwnd() != NULL) {
+		RECT r = { rect.left + 2, rect.top + 2, rect.right - 2, rect.bottom - 2 };
+		m_MainTab.MoveWindow(&r);
+	}
+	if (m_BkgndImg.GetSafeHwnd() != NULL) {
+		RECT r = { rect.right - 130, rect.top + 10, rect.right - 10, (rect.bottom - 80 - 10) / 2 + 10 - 5 };
+		m_BkgndImg.MoveWindow(&r);
+	}
+	if (m_FgndImg.GetSafeHwnd() != NULL) {
+		RECT r = { rect.right - 130, (rect.bottom - 80 - 10) / 2 + 10 + 5, rect.right - 10, rect.bottom - 80 };
+		m_FgndImg.MoveWindow(&r);
+	}
+	if (m_VideoImg.GetSafeHwnd() != NULL) {
+		RECT r = { rect.left + 10, rect.top + 10, rect.right - 140, rect.bottom - 80 };
+		m_VideoImg.MoveWindow(&r);
+	}
+	if (m_timelineStatic.GetSafeHwnd() != NULL) {
+		RECT r = { rect.left + 10, rect.bottom - 70, 10 + 320, rect.bottom - 10 };
+		m_timelineStatic.MoveWindow(&r);
+	}
+	if (m_OpenBtn.GetSafeHwnd() != NULL) {
+		RECT r = { rect.right - 130, rect.bottom - 70, rect.right - 10, rect.bottom - 10 };
+		m_OpenBtn.MoveWindow(&r);
+	}
 }
 
 
@@ -279,4 +343,20 @@ void CFrameRepeatDlg::OnTcnSelchangeMaintab(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	// TODO: Add your control notification handler code here
 	*pResult = 0;
+}
+
+
+void CFrameRepeatDlg::OnClose()
+{
+	bExit = 1;
+	if (m_pWorkThread != NULL) {
+		WaitForSingleObject(m_pWorkThread, INFINITE);
+		delete m_pWorkThread;
+		m_pWorkThread = NULL;
+	}
+	VideoCleanup(m_vc);
+	m_vc = NULL;
+	// TODO: Add your message handler code here and/or call default
+
+	CDialogEx::OnClose();
 }
