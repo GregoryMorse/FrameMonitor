@@ -176,6 +176,22 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		timeline.copyTo(canvas(cv::Rect(0, 450, 640, 30)));
 	}
 
+	if (ft.size() != 0) {
+		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(ft.begin(), ft.end());
+		double dMin = *dMinMax.first;
+		double d = *dMinMax.second;
+		cv::Mat timeline = cv::Mat::zeros(30, oscillations.size(), CV_8UC3);
+		if (d != 0) {
+			for (int i = 0; i < ft.size(); i++) {
+				if (ft[i] != 0) {
+					double pct = (ft[i] - dMin) / (d - dMin);
+					timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
+				}
+			}
+		}
+		cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
+		timeline.copyTo(canvas(cv::Rect(0, 480, 640, 30)));
+	}
 
 	return canvas;
 }
@@ -189,6 +205,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 	std::vector<std::vector<cv::Point>> contours;
 	std::vector<double> areas;
 	std::vector<double> oscCount;
+	std::vector<double> ft;
 	int UseEvery, FrameCount = 0;
 	//1440x1080 vidoes or 4:3 aspect ratio
 	if (pvc.isOpened()) {
@@ -386,9 +403,19 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 					cv::Mat MaxIndexes;
 					ellipse = MultiMat.isContinuous() ? MultiMat.reshape(0, 1) : MultiMat.clone().reshape(0, 1);
 					cv::sortIdx(ellipse, MaxIndexes, CV_SORT_DESCENDING | CV_SORT_EVERY_ROW);
-					int idx = MaxIndexes.at<int>(cv::Point(0, 0));
-					double d = MultiMat.at<double>(cv::Point(idx % MultiMat.cols, idx / MultiMat.cols));
-					FFTWindow = FFTWindow.rowRange(1, FFTWindow.rows);
+					for (int j = 0; j < FFTWindow.rows; j++) {
+						double d = 0;
+						for (int i = 0; i < 10; i++) {
+							int idx = MaxIndexes.at<int>(cv::Point(i, 0));
+							//cv::Point pt = cv::Point(idx % MultiMat.cols, idx / MultiMat.cols);
+							//double dMax = MultiMat.at<double>(pt);
+							d += FFTWindow.at<unsigned char>(cv::Point(idx / MultiMat.cols, j));
+						}
+						ft.push_back(d);
+					}
+
+					FFTWindow = cv::Mat(0, pp.iMinWidth * pp.iMinHeight, CV_8UC1);
+					//FFTWindow = FFTWindow.rowRange(1, FFTWindow.rows);
 				}
 
 				if (pf != NULL)
@@ -427,7 +454,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 
 					//cvtColor(detFrame, detFrame, CV_BGRA2RGB);
 
-					pf(DrawUI(detFrame, bkgnd, fgnd, motionDetected, oscillations, oscCount, dMaxContourSize, FrameCount, vi.dFPS, start), FrameCount);
+					pf(DrawUI(detFrame, bkgnd, fgnd, motionDetected, oscillations, oscCount, dMaxContourSize, FrameCount, vi.dFPS, start, ft), FrameCount);
 				}
 			}
 		} else break;
