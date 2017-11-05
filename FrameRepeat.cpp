@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "FrameRepeat.h"
 #include "FrameRepeatDlg.h"
+#include "Video.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -70,9 +71,12 @@ BOOL CFrameRepeatApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CFrameRepeatDlg dlg;
-	m_pMainWnd = &dlg;
-	INT_PTR nResponse = dlg.DoModal();
+	char* szFname[] { "c:\\Users\\Gregory\\Downloads\\00082.MTS" };
+	//char* szFname[] { "c:\\Users\\Gregory\\Downloads\\00086.MTS" };
+	INT_PTR nResponse = main(1, szFname);
+	//CFrameRepeatDlg dlg;
+	//m_pMainWnd = &dlg;
+	//INT_PTR nResponse = dlg.DoModal();
 	if (nResponse == IDOK)
 	{
 		// TODO: Place code here to handle when the dialog is

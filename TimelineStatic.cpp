@@ -75,14 +75,14 @@ void CTimelineStatic::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 	hbit = CreateCompatibleBitmap(lpDrawItemStruct->hDC, m_oscillation.size(), 30);
 	hOldBitmap = SelectObject(hdc, hbit);
 	r.left = 0; r.top = 0; r.right = m_oscillation.size(); r.bottom = 30;
-	FillRect(hdc, &r, (HBRUSH)HOLLOW_BRUSH);
+	FillRect(hdc, &r, (HBRUSH)BLACK_BRUSH);
 	for (int i = 0; i < m_oscillation.size(); i++) {
 		SetPixel(hdc, i, 30 * m_oscillation[i] / m_dMaxOscillation, RGB(255, 255, 255));
 	}
 	StretchBlt(lpDrawItemStruct->hDC, 0, (lpDrawItemStruct->rcItem.bottom - lpDrawItemStruct->rcItem.top) / 2,
 		lpDrawItemStruct->rcItem.right - lpDrawItemStruct->rcItem.left,
 		lpDrawItemStruct->rcItem.bottom - (lpDrawItemStruct->rcItem.bottom - lpDrawItemStruct->rcItem.top) / 2,
-		hdc, 0, 0, m_motionDetected.size(), 1, SRCCOPY);
+		hdc, 0, 0, m_oscillation.size(), 30, SRCCOPY);
 	SelectObject(hdc, hOldBitmap);
 	DeleteObject(hbit);
 	DeleteDC(hdc);

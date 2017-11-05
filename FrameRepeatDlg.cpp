@@ -6,7 +6,10 @@
 #include "FrameRepeat.h"
 #include "FrameRepeatDlg.h"
 #include "afxdialogex.h"
-#include "Video.h"
+//#include "Video.h"
+#include <functional>
+#include <locale>
+#include <codecvt>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -91,7 +94,7 @@ BOOL CFrameRepeatDlg::OnInitDialog()
 	GetClientRect(&rect);
 	m_Progress.Create(WS_VISIBLE | WS_CHILD | PBS_SMOOTH, RECT{ rect.left + 10, rect.top + 10, rect.right - 10, rect.top + 10 + 50 }, this, IDC_PROGRESS);
 	m_ProgText.Create(_T("Waiting for video..."), WS_VISIBLE | WS_CHILD | SS_CENTER, RECT{ rect.left + 10, rect.top + 10 + 60, rect.right - 10, rect.bottom - 80 }, this, IDC_PROGTEXT);
-	m_timelineStatic.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_NOTIFY, RECT{ rect.left + 10, rect.bottom - 70, 10 + 320, rect.bottom - 10 }, this, IDC_TIMELINE);
+	m_timelineStatic.Create(_T(""), WS_VISIBLE | WS_CHILD | SS_NOTIFY, RECT{ rect.left + 10, rect.bottom - 70, rect.right - 140, rect.bottom - 10 }, this, IDC_TIMELINE);
 	m_OpenBtn.Create(_T("&Open Video"), WS_VISIBLE | WS_CHILD, RECT{ rect.right - 130, rect.bottom - 70, rect.right - 10, rect.bottom - 10 }, this, IDC_OPENVIDEO);
 	m_timelineStatic.SetFont(GetFont());
 	m_OpenBtn.SetFont(GetFont());
@@ -181,9 +184,12 @@ static TCHAR BASED_CODE szFilter[] = _T("Videos (*.mp4;*.avi;*.mts)|*.mp4; *.avi
 static UINT VideoProcessor(LPVOID pParam)
 {
 	CFrameRepeatDlg* pfrd = (CFrameRepeatDlg*)pParam;
-	ProcessVideo(pfrd->m_curFile, pfrd->m_vc, pfrd->m_timelineStatic.m_motionDetected, pfrd->m_timelineStatic.m_oscillation,
+	using convert_type = std::codecvt_utf8<wchar_t>;
+	std::wstring_convert<convert_type, wchar_t> converter;
+	std::string str = converter.to_bytes(pfrd->m_curFile);
+	/*ProcessVideo(str, pfrd->m_vc, pfrd->m_timelineStatic.m_motionDetected, pfrd->m_timelineStatic.m_oscillation,
 		pfrd->m_timelineStatic.m_dMaxContourSize, pfrd->m_timelineStatic.m_dMaxOscillation,
-		std::move(std::function<ProgressFunc>([pfrd](int Frame, int TotalFrames) -> void { pfrd->PostMessage(WM_CUSTOM_OPENPROGRESS, Frame, TotalFrames); })), &pfrd->bExit);
+		std::move(std::function<ProgressFunc>([pfrd](int Frame, int TotalFrames) -> void { pfrd->PostMessage(WM_CUSTOM_OPENPROGRESS, Frame, TotalFrames); })), &pfrd->bExit);*/
 	pfrd->PostMessageW(WM_CUSTOM_OPENVIDCOMPLETE, 0, 0);
 	pfrd->PostMessageW(WM_CUSTOM_MOVEVIDEO, 0, 0);
 	return 0;
@@ -201,7 +207,7 @@ void CFrameRepeatDlg::OnBnClickedOpenvideo()
 	if (m_pWorkThread != NULL) return;
 	CFileDialog dlgFile(TRUE, _T("*.mp4"), NULL, OFN_FILEMUSTEXIST, szFilter, this);
 	if (dlgFile.DoModal() != IDCANCEL) {
-		VideoCleanup(m_vc);
+		//VideoCleanup(m_vc);
 		m_vc = NULL;
 		m_timelineStatic.m_iFrameNum = 0;
 		m_timelineStatic.m_motionDetected.clear();
@@ -275,10 +281,24 @@ HBITMAP ScaleBitmap(HBITMAP hBitmap, CWnd* wnd)
 	return hNewBitmap;
 }
 
+typedef void (ProgressFunc)(int Frame, int TotalFrames);
+
+//portable adapter layer
+HBITMAP GetVideoFrameAdapt(LPVOID p, int iFrameNum, HBITMAP & hBackground, HBITMAP & hForeground, std::function<ProgressFunc> pf, int* pCancel)
+{
+	/*if (p == NULL) return (HBITMAP)INVALID_HANDLE_VALUE;
+	cv::Mat fgnd, bkgnd, bit = GetVideoFrame(p, iFrameNum, bkgnd, fgnd, pf, pCancel);
+	hBackground = CreateBitmap(bkgnd.cols, bkgnd.rows, 1, 32, bkgnd.data);
+	//hForeground = CreateBitmap(fgnd.cols, fgnd.rows, 1, 1, fgnd.data); //scanline width must be DWORD aligned but it should be here as 640, 480 are multiples of 32!...
+	hForeground = CreateBitmap(fgnd.cols, fgnd.rows, 1, 32, fgnd.data);
+	return CreateBitmap(bit.cols, bit.rows, 1, 32, bit.data);*/
+	return NULL;
+}
+
 afx_msg LRESULT CFrameRepeatDlg::OnCustomMovevideo(WPARAM wParam, LPARAM lParam)
 {
 	if (m_vc != NULL) {
-		HBITMAP hBackground, hForeground, hBitmap = GetVideoFrameAdapt(m_vc, lParam, hBackground, hForeground, NULL, &bExit);
+		/*HBITMAP hBackground, hForeground, hBitmap = GetVideoFrameAdapt(m_vc, lParam, hBackground, hForeground, NULL, &bExit);
 
 		hBitmap = m_VideoImg.SetBitmap(ScaleBitmap(hBitmap, &m_VideoImg));
 		if (hBitmap != NULL) DeleteObject(hBitmap);
@@ -287,7 +307,7 @@ afx_msg LRESULT CFrameRepeatDlg::OnCustomMovevideo(WPARAM wParam, LPARAM lParam)
 		if (hForeground != NULL) DeleteObject(hForeground);
 
 		hBackground = m_BkgndImg.SetBitmap(ScaleBitmap(hBackground, &m_BkgndImg));
-		if (hBackground != NULL) DeleteObject(hBackground);
+		if (hBackground != NULL) DeleteObject(hBackground);*/
 	}
 	return 0;
 }
@@ -301,7 +321,7 @@ void CFrameRepeatDlg::OnDestroy()
 		delete m_pWorkThread;
 		m_pWorkThread = NULL;
 	}
-	VideoCleanup(m_vc);
+	//VideoCleanup(m_vc);
 	m_vc = NULL;
 }
 
@@ -329,7 +349,7 @@ void CFrameRepeatDlg::OnSize(UINT nType, int cx, int cy)
 		m_VideoImg.MoveWindow(&r);
 	}
 	if (m_timelineStatic.GetSafeHwnd() != NULL) {
-		RECT r = { rect.left + 10, rect.bottom - 70, 10 + 320, rect.bottom - 10 };
+		RECT r = { rect.left + 10, rect.bottom - 70, rect.right - 140, rect.bottom - 10 };
 		m_timelineStatic.MoveWindow(&r);
 	}
 	if (m_OpenBtn.GetSafeHwnd() != NULL) {
@@ -354,7 +374,7 @@ void CFrameRepeatDlg::OnClose()
 		delete m_pWorkThread;
 		m_pWorkThread = NULL;
 	}
-	VideoCleanup(m_vc);
+	//VideoCleanup(m_vc);
 	m_vc = NULL;
 	// TODO: Add your message handler code here and/or call default
 
