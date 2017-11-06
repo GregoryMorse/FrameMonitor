@@ -171,14 +171,15 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 				dMaxOsc = std::max(oscillations[i] / oscCount[i], dMaxOsc);
 			}
 		}
+		int breaths = 0;
 		if (dMaxOsc != 0) {
 			for (int i = 0; i < oscillations.size(); i++) {
 				if (oscCount[i] != 0) {
 					double pct = (oscillations[i] / oscCount[i]) / dMaxOsc;
 					if (i != 0 && i != oscillations.size() - 1 && (oscillations[i] / oscCount[i]) > (oscillations[i - 1] / oscCount[i - 1]) && (oscillations[i] / oscCount[i]) > (oscillations[i + 1] / oscCount[i + 1])) {
-						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255);
+						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 					} else if (i != 0 && i != oscillations.size() - 1 && (oscillations[i] / oscCount[i]) < (oscillations[i - 1] / oscCount[i - 1]) && (oscillations[i] / oscCount[i]) < (oscillations[i + 1] / oscCount[i + 1])) {
-						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0);
+						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
 					} else {
 						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
 					}
@@ -187,6 +188,12 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		}
 		if (oscillations.size() > 640) cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 450, 640, 30)));
+
+		char buf[256];
+		sprintf(buf, "Breaths: %lu", breaths / 2);
+		int baseLine = 0;
+		cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+		cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 450 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
 	}
 
 	if (ft.size() != 0) {
@@ -194,14 +201,15 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		double dMin = *dMinMax.first;
 		double d = *dMinMax.second;
 		cv::Mat timeline = cv::Mat::zeros(30, ft.size(), CV_8UC3);
+		int breaths = 0;
 		if (d != 0) {
 			for (int i = 0; i < ft.size(); i++) {
 				if (ft[i] != 0) {
 					double pct = (ft[i] - dMin) / (d - dMin);
 					if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
-						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255);
+						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 					} else if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
-						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0);
+						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
 					} else {
 						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
 					}
@@ -210,26 +218,39 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		}
 		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)ft.size()), 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 480, std::min(640, (int)ft.size()), 30)));
+
+		char buf[256];
+		sprintf(buf, "Breaths: %lu", breaths / 2);
+		int baseLine = 0;
+		cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+		cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 480 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
 	}
 
 	if (motionDetected.size() != 0) {
 		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin(), motionDetected.end());
 		double d = *dMinMax.second;
 		cv::Mat timeline = cv::Mat::zeros(30, motionDetected.size(), CV_8UC3);
+		int breaths = 0;
 		for (int i = 0; i < motionDetected.size(); i++) {
 			//log(exp(N) * Value) / N brings normalized value to logarithmic scale with correctly chosen N factor which is big enough to bring all values above 1
 			double pct = motionDetected[i] / d; if (pct > 1.0) pct = 1.0; if (pct > .10) pct = .10; pct *= 10;
 			pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
 			if (i != 0 && i != motionDetected.size() - 1 && (motionDetected[i] > motionDetected[i - 1]) && (motionDetected[i] > motionDetected[i + 1])) {
-				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255);
+				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 			} else if (i != 0 && i != motionDetected.size() - 1 && (motionDetected[i] < motionDetected[i - 1]) && (motionDetected[i] < motionDetected[i + 1])) {
-				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0);
+				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
 			} else {
 				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
 			}
 		}
 		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)motionDetected.size()), 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 510, std::min(640, (int)motionDetected.size()), 30)));
+
+		char buf[256];
+		sprintf(buf, "Breaths: %lu", breaths / 2);
+		int baseLine = 0;
+		cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+		cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 510 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
 	}
 
 	return canvas;
@@ -650,12 +671,21 @@ int main(int argc, char** argv)
 				}
 				if (params.breathPos.size() != 0) {
 					cv::Mat timeline = cv::Mat::zeros(1, idx + 1 / params.pp.dDesiredFPS, CV_8UC3);
-					for (int i = 0; i < params.breathPos.size(); i++) {
+					int i;
+					for (i = 0; i < params.breathPos.size(); i++) {
 						if (params.breathPos[i] <= idx) 
 							timeline.at<cv::Vec3b>(cv::Point(params.breathPos[i] / params.pp.dDesiredFPS, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
+						else break;
 					}
 					cv::resize(timeline, timeline, cv::Size(std::min(640, idx), 30), cv::INTER_MAX);
+
 					timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, idx), 30)));
+
+					char buf[256];
+					sprintf(buf, "Breaths: %lu", i / 2);
+					int baseLine = 0;
+					cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+					cv::putText(mat, cv::String(buf), cv::Point((640 - s.width) / 2, (params.pp.noProcessing ? 480 : 540) + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
 				}
 				cvSetTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
 				cv::imshow(WINDOWNAME, mat);
