@@ -108,6 +108,7 @@ bool check_oscillation(std::vector<cv::KeyPoint> kpoints, cv::Point2f ReferenceP
 //percentage of oscillation range returned using reference point distance to determine minimum distance as base, and maximum distance for %
 double get_oscillation(std::vector<cv::KeyPoint> kpoints, cv::Point2f ReferencePoint, bool bLastOnly, std::vector<double> & netVals)
 {
+	netVals.clear();
 	//int baseIdx;
 	std::transform(kpoints.begin(), kpoints.end(), std::back_inserter(netVals), [ReferencePoint](cv::KeyPoint& v) { return cv::norm(ReferencePoint - v.pt); });
 	//baseIdx = std::min_element(pts.begin(), pts.end()) - pts.begin();
@@ -134,6 +135,8 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	fgnd.copyTo(canvas(cv::Rect(480, 210, 160, 210)));
 
 	if (motionDetected.size() != 0) {
+		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin(), motionDetected.end());
+		double d = *dMinMax.second;
 		cv::Mat timeline = cv::Mat(1, motionDetected.size(), CV_8UC3);
 		for (int i = 0; i < motionDetected.size(); i++) {
 			double pct = motionDetected[i] / dMaxContourSize;
@@ -180,7 +183,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(ft.begin(), ft.end());
 		double dMin = *dMinMax.first;
 		double d = *dMinMax.second;
-		cv::Mat timeline = cv::Mat::zeros(30, oscillations.size(), CV_8UC3);
+		cv::Mat timeline = cv::Mat::zeros(30, ft.size(), CV_8UC3);
 		if (d != 0) {
 			for (int i = 0; i < ft.size(); i++) {
 				if (ft[i] != 0) {
@@ -191,6 +194,18 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		}
 		cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 480, 640, 30)));
+	}
+
+	if (motionDetected.size() != 0) {
+		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin(), motionDetected.end());
+		double d = *dMinMax.second;
+		cv::Mat timeline = cv::Mat::zeros(30, motionDetected.size(), CV_8UC3);
+		for (int i = 0; i < motionDetected.size(); i++) {
+			double pct = motionDetected[i] / dMaxContourSize; if (pct > 1.0) pct = 1.0; if (pct > .10) pct = .10; pct *= 10;
+			timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
+		}
+		cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
+		timeline.copyTo(canvas(cv::Rect(0, 510, 640, 30)));
 	}
 
 	return canvas;
@@ -280,6 +295,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 			lastdescs = cv::Mat();
 			fdps.clear();
 			cumulativeMask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
+			FFTWindow = cv::Mat(0, pp.iMinWidth * pp.iMinHeight, CV_8UC1);
 			FrameCount = iJump;
 			start = time(NULL);
 		}
@@ -318,8 +334,8 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 				}
 				motionDetected.push_back(dSumContourSize);
 
-				oscillations.push_back(0);
-				oscCount.push_back(0);
+				//oscillations.push_back(0);
+				//oscCount.push_back(0);
 
 				contourWindow.push_back(contours);
 				mask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
@@ -342,12 +358,16 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 
 				featDetector->detectAndCompute(frame, mask, kps, descs);
 				if (lastkps.size() != 0 && kps.size() != 0) {
+					std::sort(kps.begin(), kps.end(), [](cv::KeyPoint &d1, cv::KeyPoint &d2) -> bool { return d1.pt < d2.pt; });
+					kps.erase(std::unique(kps.begin(), kps.end(), [](cv::KeyPoint& p1, cv::KeyPoint& p2) { return p1.pt == p2.pt; }), kps.end());
 					matches.clear();
 					newfdps.clear();
 					matcher->match(descs, lastdescs, matches);
 					double minDist = std::min_element(matches.begin(), matches.end(), [](cv::DMatch& d1, cv::DMatch& d2) { return d1.distance < d2.distance; })->distance;
+					std::sort(matches.begin(), matches.end(), [](cv::DMatch &d1, cv::DMatch &d2) -> bool { return d1.trainIdx < d2.trainIdx; });
+					matches.erase(std::unique(matches.begin(), matches.end(), [](cv::DMatch &d1, cv::DMatch &d2) -> bool { return d1.trainIdx == d2.trainIdx; }), matches.end());
 					for (std::vector<cv::DMatch>::iterator curMatch = matches.begin(); curMatch != matches.end(); curMatch++) {
-						if (curMatch->distance > std::max(2 * minDist, 0.02)) continue; //filter noise matches
+						//if (curMatch->distance > std::max(2 * minDist, 0.02)) continue; //filter noise matches
 						//filter for periodic moving feature points -> direction, opposite direction, direction, opposite direction
 						//based on reference point - 2 breaths/oscillations - include only if meets criteria
 						if ((it = fdps.find(lastkps[curMatch->trainIdx].pt)) != fdps.end()) {
@@ -357,26 +377,52 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 							cv::Point2f refpt(pp.iMinWidth / 2, pp.iMinHeight);
 							std::vector<double> netVals;
 							if (!it->second.isOscilPoint && check_oscillation(it->second.kps, refpt)) {
-								get_oscillation(it->second.kps, refpt, false, netVals);
-								it->second.isOscilPoint = true;
-								oscillations.back() += netVals.back();
-								oscCount.back()++;
+								//get_oscillation(it->second.kps, refpt, false, netVals);
+								//it->second.isOscilPoint = true;
+								//oscillations.back() += netVals.back();
+								//oscCount.back()++;
 							} else if (it->second.isOscilPoint) {
-								double lastval = get_oscillation(it->second.kps, refpt, true, netVals);
-								oscillations.back() += lastval;
-								oscCount.back()++;
+								//double lastval = get_oscillation(it->second.kps, refpt, true, netVals);
+								//oscillations.back() += lastval;
+								//oscCount.back()++;
 							}
 							if (it->second.kps.size() > pp.iCalibrationTimeWindow * pp.dDesiredFPS) {
-								it->second.kps.erase(it->second.kps.begin(), it->second.kps.begin() + 1);
+								//it->second.kps.erase(it->second.kps.begin(), it->second.kps.begin() + 1);
 							}
 							newfdps[kps[curMatch->queryIdx].pt] = FeatureDataPoint{ FrameCount, it->second.kps, std::vector<int>(), it->second.isOscilPoint };
 						} else {
 							ks.clear();
 							ks.push_back(kps[curMatch->queryIdx]);
-							newfdps[kps[curMatch->queryIdx].pt] = FeatureDataPoint{ FrameCount, std::vector<cv::KeyPoint>(), std::vector<int>(), false };
+							newfdps[kps[curMatch->queryIdx].pt] = FeatureDataPoint{ FrameCount, ks, std::vector<int>(), false };
 						}
 					}
 					//cleans up all stale
+					if (std::any_of(newfdps.begin(), newfdps.end(), [pp](std::pair<cv::Point, FeatureDataPoint> fdp) -> bool { return fdp.second.kps.size() >= pp.iCalibrationTimeWindow * pp.dDesiredFPS; })) {
+						cv::Mat KpData = cv::Mat(0, pp.iCalibrationTimeWindow * pp.dDesiredFPS, CV_64F), MultiMat;
+						cv::Point2f refpt(pp.iMinWidth / 2, pp.iMinHeight);
+						std::vector<double> netVals;
+						for (std::map<cv::Point, FeatureDataPoint>::iterator fdp = newfdps.begin(); fdp != newfdps.end(); fdp++) {
+							get_oscillation(fdp->second.kps, refpt, false, netVals);
+							netVals.insert(netVals.begin(), pp.iCalibrationTimeWindow * pp.dDesiredFPS  - netVals.size(), 0);
+							KpData.push_back(cv::Mat(1, pp.iCalibrationTimeWindow * pp.dDesiredFPS, CV_64F, netVals.data()));
+						}
+						cv::dft(KpData, MultiMat, cv::DFT_ROWS | cv::DFT_COMPLEX_OUTPUT);
+						cv::Mat planes[2];
+						cv::split(MultiMat, planes);
+						magnitude(planes[0], planes[1], planes[0]);
+						MultiMat = planes[0].colRange(KpData.cols * .1 / pp.dDesiredFPS - 1, KpData.cols / pp.dDesiredFPS + 1);
+						cv::Mat MaxIndexes;
+						cv::Mat Sort = MultiMat.isContinuous() ? MultiMat.reshape(0, 1) : MultiMat.clone().reshape(0, 1);
+						cv::sortIdx(Sort, MaxIndexes, CV_SORT_DESCENDING | CV_SORT_EVERY_ROW);
+						for (int i = 0; i < 1; i++) { //cannot take more than 1 value without dealing with the phase shift...
+							int idx = MaxIndexes.at<int>(cv::Point(i, 0));
+							for (int j = 0; j < pp.iCalibrationTimeWindow * pp.dDesiredFPS; j++) {
+								oscillations.push_back(KpData.at<double>(cv::Point(j, idx / MultiMat.cols)));
+								oscCount.push_back(1);
+							}
+						}
+						newfdps.clear();
+					}
 					fdps = newfdps;
 				}
 				lastkps = kps;
@@ -387,7 +433,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 				cv::Mat ellipse;
 				cv::bitwise_and(frame, mask, ellipse);
 				FFTWindow.push_back(ellipse.isContinuous() ? ellipse.reshape(0, 1) : ellipse.clone().reshape(0, 1));
-				if (FFTWindow.rows > pp.iCalibrationTimeWindow * pp.dDesiredFPS) {
+				if (FFTWindow.rows >= pp.iCalibrationTimeWindow * pp.dDesiredFPS) {
 					cv::Mat MultiMat;
 					FFTWindow.convertTo(MultiMat, CV_64F);
 					int m = cv::getOptimalDFTSize(MultiMat.rows);
@@ -405,7 +451,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 					cv::sortIdx(ellipse, MaxIndexes, CV_SORT_DESCENDING | CV_SORT_EVERY_ROW);
 					for (int j = 0; j < FFTWindow.rows; j++) {
 						double d = 0;
-						for (int i = 0; i < 10; i++) {
+						for (int i = 0; i < 1; i++) { //cannot take more than 1 value without dealing with the phase shift...
 							int idx = MaxIndexes.at<int>(cv::Point(i, 0));
 							//cv::Point pt = cv::Point(idx % MultiMat.cols, idx / MultiMat.cols);
 							//double dMax = MultiMat.at<double>(pt);
