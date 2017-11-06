@@ -10,197 +10,39 @@ IF "%VSVER%"=="15" (CALL "%ProgramFiles(x86)%\Microsoft Visual Studio\2017\Enter
 IF "%VSVER%"=="11" (SET OSVER=8.0) ELSE (IF "%VSVER%"=="12" (SET OSVER=8.1) ELSE (SET OSVER=10))
 IF "%VSVER%"=="14" (SET "LIBPATH=%LIBPATH%;%ProgramFiles(x86)%\Microsoft Visual Studio 14.0\VC\lib\store\references")
 SET sources=../../../sources
-SET armtoolchain=../../../sources/platforms/winrt/arm.winrt.toolchain.cmake
+SET armtoolchain=%sources%/platforms/winrt/arm.winrt.toolchain.cmake
 IF "%VSVER%"=="15" (SET cmakedir="%ProgramFiles%\CMake\bin\cmake.exe") ELSE (SET cmakedir="%ProgramFiles(x86)%\CMake\bin\cmake.exe")
-
+IF "%2"=="x64" (SET "msvc_vars=%msvc_path_x64%\vcvars64.bat") else (IF "%2"=="x86" (SET "msvc_vars=%msvc_path_arm%\vcvars32.bat") ELSE (SET "msvc_vars=%msvc_path_arm%\vcvarsx86_arm.bat"))
+IF "%3"=="cli" (SET "cmdopts=-DCMAKE_SYSTEM_VERSION=%OSVER%") ELSE (IF "%3"=="rt" (SET "cmdopts=-DCMAKE_SYSTEM_VERSION=%OSVER% -DENABLE_WINRT_MODE_NATIVE=ON") ELSE (SET "cmdopts="))
+IF "%2"=="arm" (SET "cmdopts=%cmdopts% -DCMAKE_TOOLCHAIN_FILE=%sources%/platforms/winrt/arm.winrt.toolchain.cmake -DCMAKE_SYSTEM_NAME=WindowsPhone") ELSE (IF NOT "%3"=="st" (SET "cmdopts=%cmdopts% -DCMAKE_SYSTEM_NAME=WindowsStore"))
+IF "%2"=="x64" (SET intdir=intel64) ELSE (SET intdir=ia32)
+IF "%4"=="ON" (SET pfix=%3d) ELSE (SET pfix=%3)
 REM CMakeLists.txt must comment out the CMAKE_USE_RELATIVE_PATHS ON line due to a bug leaving trailing slashes in makefiles in CMake 3.3.1
 REM all static linked yet using shared Visual C libraries, Debug/Release, x86/x64/ARM, WinRT Native C++/WinRT C++ CLI (not strictly necessary as Native C++ will suffice)/Win32
 
-RMDIR /S /Q build\arm\vc%VSVER%cli
-RMDIR /S /Q build\x86\vc%VSVER%cli
-RMDIR /S /Q build\x64\vc%VSVER%cli
-MKDIR build\ARM\vc%VSVER%cli
-MKDIR build\x86\vc%VSVER%cli
-MKDIR build\x64\vc%VSVER%cli
+RMDIR /S /Q build\%2\vc%VSVER%%pfix%
+MKDIR build\%2\vc%VSVER%%pfix%
 
-CD build\ARM\vc%VSVER%cli
+CD build\%2\vc%VSVER%%pfix%
 DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsPhone -DCMAKE_SYSTEM_VERSION=%OSVER% -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF -DCMAKE_TOOLCHAIN_FILE=%armtoolchain% %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
+%COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug %cmdopts% -DBUILD_SHARED_LIBS=%4 -DBUILD_WITH_STATIC_CRT=%4 -DOPENCV_EXTRA_MODULES_PATH=../../../../../opencv_contrib331/modules -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
+%COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video && nmake.exe opencv_highgui && nmake.exe opencv_xfeatures2d"
 DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsPhone -DCMAKE_SYSTEM_VERSION=%OSVER% -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF -DCMAKE_TOOLCHAIN_FILE=%armtoolchain% %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
+%COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo %cmdopts% -DBUILD_SHARED_LIBS=%4 -DBUILD_WITH_STATIC_CRT=%4 -DOPENCV_EXTRA_MODULES_PATH=../../../../../opencv_contrib331/modules -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
+%COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video && nmake.exe opencv_highgui && nmake.exe opencv_xfeatures2d"
 CD ..\..\..
 
-CD build\x86\vc%VSVER%cli
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=%OSVER% -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=%OSVER% -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-CD ..\..\..
+MKDIR ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\lib 2>nul
+MKDIR ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\bin 2>nul
+COPY /Y build\%2\vc%VSVER%%pfix%\3rdparty\ippicv\ippicv_win\lib\%intdir%\ippicvmt.lib ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\lib
+COPY /Y build\%2\vc%VSVER%%pfix%\3rdparty\ippicv\ippiw_win\lib\%intdir%\ipp_iw.lib ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\lib
+COPY /Y build\%2\vc%VSVER%%pfix%\3rdparty\lib\*.lib ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\lib
+COPY /Y build\%2\vc%VSVER%%pfix%\3rdparty\lib\*.pdb ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\lib
+COPY /Y build\%2\vc%VSVER%%pfix%\lib\*.lib ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\lib
+COPY /Y build\%2\vc%VSVER%%pfix%\lib\*.pdb ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\lib
+COPY /Y build\%2\vc%VSVER%%pfix%\bin\*.dll ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\bin
+COPY /Y build\%2\vc%VSVER%%pfix%\bin\*.pdb ..\..\opencv.new\build\%2\vc%VSVER%%pfix%\bin
 
-CD build\x64\vc%VSVER%cli
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=%OSVER% -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=%OSVER% -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-CD ..\..\..
-
-RMDIR /S /Q build\arm\vc%VSVER%rt
-RMDIR /S /Q build\x86\vc%VSVER%rt
-RMDIR /S /Q build\x64\vc%VSVER%rt
-MKDIR build\ARM\vc%VSVER%rt
-MKDIR build\x86\vc%VSVER%rt
-MKDIR build\x64\vc%VSVER%rt
-
-CD build\ARM\vc%VSVER%rt
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsPhone -DCMAKE_SYSTEM_VERSION=%OSVER% -DENABLE_WINRT_MODE_NATIVE=ON -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF -DCMAKE_TOOLCHAIN_FILE=%armtoolchain% %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsPhone -DCMAKE_SYSTEM_VERSION=%OSVER% -DENABLE_WINRT_MODE_NATIVE=ON -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF -DCMAKE_TOOLCHAIN_FILE=%armtoolchain% %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-CD ..\..\..
-
-CD build\x86\vc%VSVER%rt
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=%OSVER% -DENABLE_WINRT_MODE_NATIVE=ON -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=%OSVER% -DENABLE_WINRT_MODE_NATIVE=ON -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-CD ..\..\..
-
-CD build\x64\vc%VSVER%rt
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=%OSVER% -DENABLE_WINRT_MODE_NATIVE=ON -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=%OSVER% -DENABLE_WINRT_MODE_NATIVE=ON -DWITH_FFMPEG=OFF -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-CD ..\..\..
-
-RMDIR /S /Q build\arm\vc%VSVER%st
-RMDIR /S /Q build\x86\vc%VSVER%st
-RMDIR /S /Q build\x64\vc%VSVER%st
-MKDIR build\ARM\vc%VSVER%st
-MKDIR build\x86\vc%VSVER%st
-MKDIR build\x64\vc%VSVER%st
-
-CD build\ARM\vc%VSVER%st
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF -DCMAKE_TOOLCHAIN_FILE=%armtoolchain% %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF -DCMAKE_TOOLCHAIN_FILE=%armtoolchain% %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_arm%\vcvarsx86_arm.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-CD ..\..\..
-
-CD build\x86\vc%VSVER%st
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x86%\vcvars32.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-CD ..\..\..
-
-CD build\x64\vc%VSVER%st
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_SHARED_LIBS=OFF -DBUILD_WITH_STATIC_CRT=OFF -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
-%COMSPEC% /S /C "CALL "%msvc_path_x64%\vcvars64.bat" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video"
-CD ..\..\..
-
-MKDIR ..\..\opencv.new\build\x86\vc%VSVER%cli\lib 2>nul
-MKDIR ..\..\opencv.new\build\x86\vc%VSVER%cli\bin 2>nul
-COPY /Y build\x86\vc%VSVER%cli\3rdparty\lib\*.lib ..\..\opencv.new\build\x86\vc%VSVER%cli\lib
-COPY /Y build\x86\vc%VSVER%cli\3rdparty\lib\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%cli\lib
-COPY /Y build\x86\vc%VSVER%cli\lib\*.lib ..\..\opencv.new\build\x86\vc%VSVER%cli\lib
-COPY /Y build\x86\vc%VSVER%cli\lib\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%cli\lib
-COPY /Y build\x86\vc%VSVER%cli\bin\*.dll ..\..\opencv.new\build\x86\vc%VSVER%cli\bin
-COPY /Y build\x86\vc%VSVER%cli\bin\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%cli\bin
-
-MKDIR ..\..\opencv.new\build\x64\vc%VSVER%cli\lib 2>nul
-MKDIR ..\..\opencv.new\build\x64\vc%VSVER%cli\bin 2>nul
-COPY /Y build\x64\vc%VSVER%cli\3rdparty\lib\*.lib ..\..\opencv.new\build\x64\vc%VSVER%cli\lib
-COPY /Y build\x64\vc%VSVER%cli\3rdparty\lib\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%cli\lib
-COPY /Y build\x64\vc%VSVER%cli\lib\*.lib ..\..\opencv.new\build\x64\vc%VSVER%cli\lib
-COPY /Y build\x64\vc%VSVER%cli\lib\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%cli\lib
-COPY /Y build\x64\vc%VSVER%cli\bin\*.dll ..\..\opencv.new\build\x64\vc%VSVER%cli\bin
-COPY /Y build\x64\vc%VSVER%cli\bin\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%cli\bin
-
-MKDIR ..\..\opencv.new\build\ARM\vc%VSVER%cli\lib 2>nul
-MKDIR ..\..\opencv.new\build\ARM\vc%VSVER%cli\bin 2>nul
-COPY /Y build\ARM\vc%VSVER%cli\3rdparty\lib\*.lib ..\..\opencv.new\build\ARM\vc%VSVER%cli\lib
-COPY /Y build\ARM\vc%VSVER%cli\3rdparty\lib\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%cli\lib
-COPY /Y build\ARM\vc%VSVER%cli\lib\*.lib ..\..\opencv.new\build\ARM\vc%VSVER%cli\lib
-COPY /Y build\ARM\vc%VSVER%cli\lib\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%cli\lib
-COPY /Y build\ARM\vc%VSVER%cli\bin\*.dll ..\..\opencv.new\build\ARM\vc%VSVER%cli\bin
-COPY /Y build\ARM\vc%VSVER%cli\bin\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%cli\bin
-
-MKDIR ..\..\opencv.new\build\x86\vc%VSVER%rt\lib 2>nul
-MKDIR ..\..\opencv.new\build\x86\vc%VSVER%rt\bin 2>nul
-COPY /Y build\x86\vc%VSVER%rt\3rdparty\lib\*.lib ..\..\opencv.new\build\x86\vc%VSVER%rt\lib
-COPY /Y build\x86\vc%VSVER%rt\3rdparty\lib\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%rt\lib
-COPY /Y build\x86\vc%VSVER%rt\lib\*.lib ..\..\opencv.new\build\x86\vc%VSVER%rt\lib
-COPY /Y build\x86\vc%VSVER%rt\lib\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%rt\lib
-COPY /Y build\x86\vc%VSVER%rt\bin\*.dll ..\..\opencv.new\build\x86\vc%VSVER%rt\bin
-COPY /Y build\x86\vc%VSVER%rt\bin\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%rt\bin
-
-MKDIR ..\..\opencv.new\build\x64\vc%VSVER%rt\lib 2>nul
-MKDIR ..\..\opencv.new\build\x64\vc%VSVER%rt\bin 2>nul
-COPY /Y build\x64\vc%VSVER%rt\3rdparty\lib\*.lib ..\..\opencv.new\build\x64\vc%VSVER%rt\lib
-COPY /Y build\x64\vc%VSVER%rt\3rdparty\lib\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%rt\lib
-COPY /Y build\x64\vc%VSVER%rt\lib\*.lib ..\..\opencv.new\build\x64\vc%VSVER%rt\lib
-COPY /Y build\x64\vc%VSVER%rt\lib\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%rt\lib
-COPY /Y build\x64\vc%VSVER%rt\bin\*.dll ..\..\opencv.new\build\x64\vc%VSVER%rt\bin
-COPY /Y build\x64\vc%VSVER%rt\bin\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%rt\bin
-
-MKDIR ..\..\opencv.new\build\ARM\vc%VSVER%rt\lib 2>nul
-MKDIR ..\..\opencv.new\build\ARM\vc%VSVER%rt\bin 2>nul
-COPY /Y build\ARM\vc%VSVER%rt\3rdparty\lib\*.lib ..\..\opencv.new\build\ARM\vc%VSVER%rt\lib
-COPY /Y build\ARM\vc%VSVER%rt\3rdparty\lib\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%rt\lib
-COPY /Y build\ARM\vc%VSVER%rt\lib\*.lib ..\..\opencv.new\build\ARM\vc%VSVER%rt\lib
-COPY /Y build\ARM\vc%VSVER%rt\lib\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%rt\lib
-COPY /Y build\ARM\vc%VSVER%rt\bin\*.dll ..\..\opencv.new\build\ARM\vc%VSVER%rt\bin
-COPY /Y build\ARM\vc%VSVER%rt\bin\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%rt\bin
-
-MKDIR ..\..\opencv.new\build\x86\vc%VSVER%st\lib 2>nul
-MKDIR ..\..\opencv.new\build\x86\vc%VSVER%st\bin 2>nul
-COPY /Y build\x86\vc%VSVER%st\3rdparty\ippicv\ippicv_win\lib\ia32\ippicvmt.lib ..\..\opencv.new\build\x86\vc%VSVER%st\lib
-COPY /Y build\x86\vc%VSVER%st\3rdparty\ippicv\ippiw_win\lib\ia32\ipp_iw.lib ..\..\opencv.new\build\x86\vc%VSVER%st\lib
-COPY /Y build\x86\vc%VSVER%st\3rdparty\lib\*.lib ..\..\opencv.new\build\x86\vc%VSVER%st\lib
-COPY /Y build\x86\vc%VSVER%st\3rdparty\lib\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%st\lib
-COPY /Y build\x86\vc%VSVER%st\lib\*.lib ..\..\opencv.new\build\x86\vc%VSVER%st\lib
-COPY /Y build\x86\vc%VSVER%st\lib\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%st\lib
-COPY /Y build\x86\vc%VSVER%st\bin\*.dll ..\..\opencv.new\build\x86\vc%VSVER%st\bin
-COPY /Y build\x86\vc%VSVER%st\bin\*.pdb ..\..\opencv.new\build\x86\vc%VSVER%st\bin
-
-MKDIR ..\..\opencv.new\build\x64\vc%VSVER%st\lib 2>nul
-MKDIR ..\..\opencv.new\build\x64\vc%VSVER%st\bin 2>nul
-COPY /Y build\x64\vc%VSVER%st\3rdparty\ippicv\ippicv_win\lib\intel64\ippicvmt.lib ..\..\opencv.new\build\x64\vc%VSVER%st\lib
-COPY /Y build\x64\vc%VSVER%st\3rdparty\ippicv\ippiw_win\lib\intel64\ipp_iw.lib ..\..\opencv.new\build\x64\vc%VSVER%st\lib
-COPY /Y build\x64\vc%VSVER%st\3rdparty\lib\*.lib ..\..\opencv.new\build\x64\vc%VSVER%st\lib
-COPY /Y build\x64\vc%VSVER%st\3rdparty\lib\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%st\lib
-COPY /Y build\x64\vc%VSVER%st\lib\*.lib ..\..\opencv.new\build\x64\vc%VSVER%st\lib
-COPY /Y build\x64\vc%VSVER%st\lib\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%st\lib
-COPY /Y build\x64\vc%VSVER%st\bin\*.dll ..\..\opencv.new\build\x64\vc%VSVER%st\bin
-COPY /Y build\x64\vc%VSVER%st\bin\*.pdb ..\..\opencv.new\build\x64\vc%VSVER%st\bin
-
-MKDIR ..\..\opencv.new\build\ARM\vc%VSVER%st\lib 2>nul
-MKDIR ..\..\opencv.new\build\ARM\vc%VSVER%st\bin 2>nul
-COPY /Y build\ARM\vc%VSVER%st\3rdparty\lib\*.lib ..\..\opencv.new\build\ARM\vc%VSVER%st\lib
-COPY /Y build\ARM\vc%VSVER%st\3rdparty\lib\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%st\lib
-COPY /Y build\ARM\vc%VSVER%st\lib\*.lib ..\..\opencv.new\build\ARM\vc%VSVER%st\lib
-COPY /Y build\ARM\vc%VSVER%st\lib\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%st\lib
-COPY /Y build\ARM\vc%VSVER%st\bin\*.dll ..\..\opencv.new\build\ARM\vc%VSVER%st\bin
-COPY /Y build\ARM\vc%VSVER%st\bin\*.pdb ..\..\opencv.new\build\ARM\vc%VSVER%st\bin
+RMDIR /S /Q build\%2\vc%VSVER%%pfix%
 SET VSVER=
 SET OSVER=

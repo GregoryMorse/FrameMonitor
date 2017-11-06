@@ -5,7 +5,6 @@
 #include "stdafx.h"
 #include "FrameRepeat.h"
 #include "FrameRepeatDlg.h"
-#include "Video.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -35,6 +34,7 @@ CFrameRepeatApp::CFrameRepeatApp()
 
 CFrameRepeatApp theApp;
 
+extern int main(int, char**);
 
 // CFrameRepeatApp initialization
 

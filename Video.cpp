@@ -8,6 +8,8 @@
 //Eulerian video magnification technique to find subtle motion
 
 #pragma once
+#define _CRT_SECURE_NO_WARNINGS
+#include <chrono>
 #include <thread>
 #include <mutex>
 #include "opencv2/opencv.hpp"
@@ -36,7 +38,6 @@ struct ProcessParams
 	int iMaxFrames;
 	int iCalibrationTimeWindow;
 	bool bMOG;
-	int history;
 	double threshold;
 	bool bShadowDetection;
 	int nMixtures;
@@ -46,6 +47,7 @@ struct ProcessParams
 	bool drawContours;
 	bool drawFeaturePoints;
 	bool drawMatches;
+	bool noProcessing;
 };
 
 struct VidInfo
@@ -64,7 +66,7 @@ struct FeatureDataPoint
 	bool isOscilPoint;
 };
 
-void VideoCleanup(LPVOID p)
+void VideoCleanup(void* p)
 {
 	if (p == NULL) return;
 	cv::VideoCapture* pvc = (cv::VideoCapture*)p;
@@ -125,7 +127,7 @@ double get_oscillation(std::vector<cv::KeyPoint> kpoints, cv::Point2f ReferenceP
 cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> & motionDetected, std::vector<double> & oscillations, std::vector<double> & oscCount, double dMaxContourSize,
 	int frameNum, int framesPerSecond, time_t startTime, std::vector<double> & ft)
 {
-	cv::Mat canvas = cv::Mat3b(540, 640, cv::Vec3b(0, 0, 0));
+	cv::Mat canvas = cv::Mat3b(570, 640, cv::Vec3b(0, 0, 0));
 	//480x420, 480x60, 160x210, 160x210
 	cv::resize(frame, frame, cv::Size(480, 420), cv::INTER_CUBIC);
 	frame.copyTo(canvas(cv::Rect(0, 0, 480, 420)));
@@ -133,6 +135,21 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	bkgnd.copyTo(canvas(cv::Rect(480, 0, 160, 210)));
 	cv::resize(fgnd, fgnd, cv::Size(160, 210), cv::INTER_CUBIC);
 	fgnd.copyTo(canvas(cv::Rect(480, 210, 160, 210)));
+
+	//FPS
+	char buf[256];
+	time_t now = time(NULL);
+	sprintf(buf, "Frame: %lu", frameNum);
+	int baseLine = 0;
+	cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+	cv::putText(canvas, cv::String(buf), cv::Point(480 + (160 - s.width) / 2, 210 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+	sprintf(buf, "Time: %lu", frameNum / framesPerSecond);
+	s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+	cv::putText(canvas, cv::String(buf), cv::Point(480 + (160 - s.width) / 2, 210 + 10 + 15), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+	sprintf(buf, "Processing FPS: %lu", now == startTime ? 0 : frameNum / (int)(now - startTime));
+	s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+	cv::putText(canvas, cv::String(buf), cv::Point(480 + (160 - s.width) / 2, 210 + 10 + 30), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+
 
 	if (motionDetected.size() != 0) {
 		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin(), motionDetected.end());
@@ -142,13 +159,13 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			double pct = motionDetected[i] / dMaxContourSize;
 			timeline.at<cv::Vec3b>(cv::Point(i, 0)) = cv::Vec3b(pct > 0.5 ? 0 : 255 * (1 - pct * 2), 255 * (pct > 0.5 ? (pct * 2 - 1) : 1), 255);
 		}
-		cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
-		timeline.copyTo(canvas(cv::Rect(0, 420, 640, 30)));
+		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)motionDetected.size()), 30), cv::INTER_MAX);
+		timeline.copyTo(canvas(cv::Rect(0, 420, std::min(640, (int)motionDetected.size()), 30)));
 	}
 
 	if (oscillations.size() != 0) {
 		double dMaxOsc = 0;
-		cv::Mat timeline = cv::Mat::zeros(30, oscillations.size(), CV_8UC3);
+		cv::Mat timeline = cv::Mat::zeros(30, std::max(640, (int)oscillations.size()), CV_8UC3);
 		for (int i = 0; i < oscCount.size(); i++) {
 			if (oscCount[i] != 0) {
 				dMaxOsc = std::max(oscillations[i] / oscCount[i], dMaxOsc);
@@ -168,14 +185,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 				}
 			}
 		}
-		cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
-		//FPS
-		char buf[256];
-		time_t now = time(NULL);
-		sprintf(buf, "Frame: %lu Time: %lu Processing FPS: %lu", frameNum, frameNum / framesPerSecond, now == startTime ? 0 : frameNum / (int)(now - startTime));
-		int baseLine = 0;
-		cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-		cv::putText(timeline, cv::String(buf), cv::Point((640 - s.width) / 2, 25), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+		if (oscillations.size() > 640) cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 450, 640, 30)));
 	}
 
@@ -188,12 +198,18 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			for (int i = 0; i < ft.size(); i++) {
 				if (ft[i] != 0) {
 					double pct = (ft[i] - dMin) / (d - dMin);
-					timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
+					if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
+						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255);
+					} else if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
+						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0);
+					} else {
+						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
+					}
 				}
 			}
 		}
-		cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
-		timeline.copyTo(canvas(cv::Rect(0, 480, 640, 30)));
+		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)ft.size()), 30), cv::INTER_MAX);
+		timeline.copyTo(canvas(cv::Rect(0, 480, std::min(640, (int)ft.size()), 30)));
 	}
 
 	if (motionDetected.size() != 0) {
@@ -201,19 +217,26 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		double d = *dMinMax.second;
 		cv::Mat timeline = cv::Mat::zeros(30, motionDetected.size(), CV_8UC3);
 		for (int i = 0; i < motionDetected.size(); i++) {
-			double pct = motionDetected[i] / dMaxContourSize; if (pct > 1.0) pct = 1.0; if (pct > .10) pct = .10; pct *= 10;
-			timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
+			//log(exp(N) * Value) / N brings normalized value to logarithmic scale with correctly chosen N factor which is big enough to bring all values above 1
+			double pct = motionDetected[i] / d; if (pct > 1.0) pct = 1.0; if (pct > .10) pct = .10; pct *= 10;
+			pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
+			if (i != 0 && i != motionDetected.size() - 1 && (motionDetected[i] > motionDetected[i - 1]) && (motionDetected[i] > motionDetected[i + 1])) {
+				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255);
+			} else if (i != 0 && i != motionDetected.size() - 1 && (motionDetected[i] < motionDetected[i - 1]) && (motionDetected[i] < motionDetected[i + 1])) {
+				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0);
+			} else {
+				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
+			}
 		}
-		cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
-		timeline.copyTo(canvas(cv::Rect(0, 510, 640, 30)));
+		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)motionDetected.size()), 30), cv::INTER_MAX);
+		timeline.copyTo(canvas(cv::Rect(0, 510, std::min(640, (int)motionDetected.size()), 30)));
 	}
 
 	return canvas;
 }
 
-void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & motionDetected, std::vector<double> & oscillations, double & dMaxContourSize, double & dMaxOscillation, std::function<ProgressFunc> pf, int* pCancel, int* iJumpFrame)
+void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vector<double> & motionDetected, std::vector<double> & oscillations, double & dMaxContourSize, double & dMaxOscillation, std::function<ProgressFunc> pf, int* pCancel, int* iJumpFrame)
 {
-	ProcessParams pp = ProcessParams{ true, 800, 600, -1, 10, true, 500, 10, true, 3, 5, 0, 0, true, true, true };
 	cv::Mat frame, fgimg;
 	double dSumContourSize;
 	cv::Ptr<cv::BackgroundSubtractor> bg;
@@ -222,9 +245,10 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 	std::vector<double> oscCount;
 	std::vector<double> ft;
 	int UseEvery, FrameCount = 0;
-	//1440x1080 vidoes or 4:3 aspect ratio
+	//1440x1080 vidoes or 4:3 aspect ratio, 25fps
+	int frameHistory = pp.iCalibrationTimeWindow * pp.dDesiredFPS;
 	if (pvc.isOpened()) {
-		bg = pp.bMOG ? (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorMOG2(pp.history, pp.threshold, pp.bShadowDetection) : (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorKNN(pp.history, pp.threshold, pp.bShadowDetection);
+		bg = pp.bMOG ? (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorMOG2(frameHistory, pp.threshold, pp.bShadowDetection) : (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorKNN(frameHistory, pp.threshold, pp.bShadowDetection);
 		if (pp.bMOG) {
 			((cv::BackgroundSubtractorMOG2*)bg.get())->setNMixtures(pp.nMixtures);
 		}
@@ -281,8 +305,8 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 		int iJump;
 		if ((iJump = *iJumpFrame) != 0) {
 			*iJumpFrame = 0;
-			pvc.set(CV_CAP_PROP_POS_FRAMES, (iJump > pp.history) ? iJump - pp.history : 0); //CV_CAP_PROP_POS_MSEC
-			bg = pp.bMOG ? (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorMOG2(pp.history, pp.threshold, pp.bShadowDetection) : (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorKNN(pp.history, pp.threshold, pp.bShadowDetection);
+			pvc.set(CV_CAP_PROP_POS_FRAMES, (iJump > frameHistory) ? iJump - frameHistory : 0); //CV_CAP_PROP_POS_MSEC
+			bg = pp.bMOG ? (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorMOG2(frameHistory, pp.threshold, pp.bShadowDetection) : (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorKNN(frameHistory, pp.threshold, pp.bShadowDetection);
 			if (pp.bMOG) {
 				((cv::BackgroundSubtractorMOG2*)bg.get())->setNMixtures(pp.nMixtures);
 			}
@@ -305,14 +329,25 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 			vc.retrieve(img);
 		}*/
 		pvc >> frame; //calls read which is the same as grab/retrieve combined
-		cv::Mat detFrame = frame.clone();
 		//CV_CAP_PROP_FRAME_COUNT, CV_CAP_PROP_FORMAT, CV_CAP_PROP_POS_MSEC, CV_CAP_PROP_POS_FRAMES
 		//if (!vc.isOpened()) break;
 		if (!*pCancel && frame.dims != 0 && FrameCount != pp.iMaxFrames) {
-			if (FrameCount % UseEvery == 0) {
+			//frame.cols; frame.rows;
+			//int chan = frame.channels(), type = frame.type(), depth = frame.depth(); //CV_8UC3
+			if (pp.noProcessing) {
+				if (pf != NULL) {
+					cv::Mat canvas = cv::Mat3b(510, 640, cv::Vec3b(0, 0, 0));
+					cv::resize(frame, frame, cv::Size(640, 480), cv::INTER_CUBIC);
+					frame.copyTo(canvas(cv::Rect(0, 0, 640, 480)));
+					pf(canvas, FrameCount);
+				}
+				FrameCount++;
+				continue;
+			} else if (FrameCount % UseEvery == 0) {
+				cv::Mat detFrame = frame.clone();
 				//conversion for processing
 				if (pp.iMinHeight != 0 || pp.iMinWidth != 0) cv::resize(frame, frame, cv::Size(pp.iMinWidth, pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
-				if (pp.bGrayScale) cvtColor(frame, frame, CV_BGRA2GRAY);
+				if (pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
 
 				//motion detection
 				bg->apply(frame, fgimg);
@@ -341,7 +376,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 				mask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
 				cv::drawContours(mask, contourWindow.back(), -1, cv::Scalar(1), CV_FILLED);
 				cumulativeMask += mask;
-				if (contourWindow.size() > pp.iCalibrationTimeWindow * pp.dDesiredFPS) {
+				if (contourWindow.size() > frameHistory) {
 					mask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
 					cv::drawContours(mask, contourWindow.front(), -1, cv::Scalar(1), CV_FILLED);
 					cumulativeMask -= mask;
@@ -386,7 +421,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 								//oscillations.back() += lastval;
 								//oscCount.back()++;
 							}
-							if (it->second.kps.size() > pp.iCalibrationTimeWindow * pp.dDesiredFPS) {
+							if (it->second.kps.size() > frameHistory) {
 								//it->second.kps.erase(it->second.kps.begin(), it->second.kps.begin() + 1);
 							}
 							newfdps[kps[curMatch->queryIdx].pt] = FeatureDataPoint{ FrameCount, it->second.kps, std::vector<int>(), it->second.isOscilPoint };
@@ -397,14 +432,14 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 						}
 					}
 					//cleans up all stale
-					if (std::any_of(newfdps.begin(), newfdps.end(), [pp](std::pair<cv::Point, FeatureDataPoint> fdp) -> bool { return fdp.second.kps.size() >= pp.iCalibrationTimeWindow * pp.dDesiredFPS; })) {
-						cv::Mat KpData = cv::Mat(0, pp.iCalibrationTimeWindow * pp.dDesiredFPS, CV_64F), MultiMat;
+					if (std::any_of(newfdps.begin(), newfdps.end(), [frameHistory](std::pair<cv::Point, FeatureDataPoint> fdp) -> bool { return fdp.second.kps.size() >= frameHistory; })) {
+						cv::Mat KpData = cv::Mat(0, frameHistory, CV_64F), MultiMat;
 						cv::Point2f refpt(pp.iMinWidth / 2, pp.iMinHeight);
 						std::vector<double> netVals;
 						for (std::map<cv::Point, FeatureDataPoint>::iterator fdp = newfdps.begin(); fdp != newfdps.end(); fdp++) {
 							get_oscillation(fdp->second.kps, refpt, false, netVals);
-							netVals.insert(netVals.begin(), pp.iCalibrationTimeWindow * pp.dDesiredFPS  - netVals.size(), 0);
-							KpData.push_back(cv::Mat(1, pp.iCalibrationTimeWindow * pp.dDesiredFPS, CV_64F, netVals.data()));
+							netVals.insert(netVals.begin(), frameHistory - netVals.size(), 0);
+							KpData.push_back(cv::Mat(1, frameHistory, CV_64F, netVals.data()));
 						}
 						cv::dft(KpData, MultiMat, cv::DFT_ROWS | cv::DFT_COMPLEX_OUTPUT);
 						cv::Mat planes[2];
@@ -416,7 +451,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 						cv::sortIdx(Sort, MaxIndexes, CV_SORT_DESCENDING | CV_SORT_EVERY_ROW);
 						for (int i = 0; i < 1; i++) { //cannot take more than 1 value without dealing with the phase shift...
 							int idx = MaxIndexes.at<int>(cv::Point(i, 0));
-							for (int j = 0; j < pp.iCalibrationTimeWindow * pp.dDesiredFPS; j++) {
+							for (int j = 0; j < frameHistory; j++) {
 								oscillations.push_back(KpData.at<double>(cv::Point(j, idx / MultiMat.cols)));
 								oscCount.push_back(1);
 							}
@@ -433,7 +468,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 				cv::Mat ellipse;
 				cv::bitwise_and(frame, mask, ellipse);
 				FFTWindow.push_back(ellipse.isContinuous() ? ellipse.reshape(0, 1) : ellipse.clone().reshape(0, 1));
-				if (FFTWindow.rows >= pp.iCalibrationTimeWindow * pp.dDesiredFPS) {
+				if (FFTWindow.rows >= frameHistory) {
 					cv::Mat MultiMat;
 					FFTWindow.convertTo(MultiMat, CV_64F);
 					int m = cv::getOptimalDFTSize(MultiMat.rows);
@@ -467,7 +502,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 				if (pf != NULL)
 				{
 					bg.get()->getBackgroundImage(bkgnd);
-					cv::cvtColor(bkgnd, bkgnd, pp.bGrayScale ? CV_GRAY2RGB : CV_BGRA2RGB);
+					cv::cvtColor(bkgnd, bkgnd, pp.bGrayScale ? CV_GRAY2RGB : CV_BGR2RGB);
 
 					//fgnd = fgimg.clone();
 					cv::cvtColor(fgimg, fgnd, CV_GRAY2RGB);
@@ -498,7 +533,7 @@ void ProcessVideo(VidInfo vi, cv::VideoCapture & pvc, std::vector<double> & moti
 					} else cv::drawKeypoints(detFrame, lastkps, detFrame);
 					//cv::drawMatches(frame, kps, frame, kps, matches, frame);
 
-					//cvtColor(detFrame, detFrame, CV_BGRA2RGB);
+					//cvtColor(detFrame, detFrame, CV_BGR2RGB);
 
 					pf(DrawUI(detFrame, bkgnd, fgnd, motionDetected, oscillations, oscCount, dMaxContourSize, FrameCount, vi.dFPS, start, ft), FrameCount);
 				}
@@ -527,12 +562,17 @@ struct StartParams
 	mutable std::mutex m;
 	int iCurPos;
 	int iJumpFrame;
+	std::vector<int> breathPos;
+	ProcessParams pp;
 };
 
 void VideoProcessor(StartParams& p)
 {
-	ProcessVideo(p.vi, *p.pvc, p.motionDetect, p.osc, p.dMaxContour, p.dMaxOsc,
+	ProcessVideo(p.vi, p.pp, *p.pvc, p.motionDetect, p.osc, p.dMaxContour, p.dMaxOsc,
 		std::move(std::function<ProgressFunc>([&p](cv::Mat mat, int Frame) -> void {
+		while (p.imgQueue.size() > 10 && !p.pc) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
 		std::lock_guard<std::mutex> lock(p.m);
 		p.imgFrameNum.push(Frame);
 		p.imgQueue.push(mat);
@@ -545,25 +585,59 @@ void ChangeVideoPos(int Pos, void* p)
 		((StartParams*)p)->iJumpFrame = Pos;
 }
 
+void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
+{
+	if (event == cv::EVENT_LBUTTONDOWN) {
+		((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
+	} else if (event == cv::EVENT_LBUTTONUP) {
+		((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
+	}
+}
+
+#if defined(_WIN32) || defined(_WIN64) || defined(_WINDOWS)
+#define FIRST_ARG 0
+#else
+#define FIRST_ARG 1
+#endif
+
 int main(int argc, char** argv)
 {
 	cvNamedWindow(WINDOWNAME, CV_WINDOW_AUTOSIZE);
-	StartParams params = { new cv::VideoCapture() };
+	StartParams params = { };
+	params.pvc = new cv::VideoCapture();
 	//1440x1080 vidoes or 4:3 aspect ratio
-	if (argc == 0 ? params.pvc->open(0) : params.pvc->open(argv[0])) {
+	std::string metaFile = (argc == FIRST_ARG) ? "cap0.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".md");
+	std::ifstream inpBreath(metaFile);
+	if (inpBreath.is_open()) {
+		std::string line;
+		int size;
+		inpBreath >> size;
+		while (size-- != 0) {
+			int b;
+			inpBreath >> b;
+			params.breathPos.push_back(b);
+		}
+		//while (std::getline(inpBreath, line)) {}
+		inpBreath.close();
+	}
+	if (argc == FIRST_ARG ? params.pvc->open(0) : params.pvc->open(argv[FIRST_ARG])) {
 		params.vi.dFPS = params.pvc->get(CV_CAP_PROP_FPS);
 		params.vi.dFrameCount = params.pvc->get(CV_CAP_PROP_FRAME_COUNT);
 		params.vi.dwWidthInPixels = params.pvc->get(CV_CAP_PROP_FRAME_WIDTH);
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
+	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, false };
+	cvSetMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cvCreateTrackbar2(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
 	std::thread vidProc(&VideoProcessor, std::ref(params));
+	std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
 	while (true) {
+		//locking scope, not a unique_lock because only used once
 		{
 			std::lock_guard<std::mutex> lock(params.m);
 			if (params.imgQueue.size() != 0) {
 				cv::Mat mat;
-				int idx = 0;
+				int idx = -1; 
 				while (params.imgQueue.size() != 0) {
 					int nextIdx = params.imgFrameNum.front();
 					params.imgFrameNum.pop();
@@ -572,16 +646,36 @@ int main(int argc, char** argv)
 						mat = params.imgQueue.front();
 					}
 					params.imgQueue.pop();
+					if (params.pp.noProcessing) break;
+				}
+				if (params.breathPos.size() != 0) {
+					cv::Mat timeline = cv::Mat::zeros(1, idx + 1 / params.pp.dDesiredFPS, CV_8UC3);
+					for (int i = 0; i < params.breathPos.size(); i++) {
+						if (params.breathPos[i] <= idx) 
+							timeline.at<cv::Vec3b>(cv::Point(params.breathPos[i] / params.pp.dDesiredFPS, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
+					}
+					cv::resize(timeline, timeline, cv::Size(std::min(640, idx), 30), cv::INTER_MAX);
+					timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, idx), 30)));
 				}
 				cvSetTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
 				cv::imshow(WINDOWNAME, mat);
 			}
 		}
-		int c = cvWaitKey(1); if (c == 27) break;
+		std::chrono::duration<double, std::milli> elapsed = std::chrono::high_resolution_clock::now() - start;
+		int c = cvWaitKey(std::max(1, (int)(1000 * params.iCurPos / params.vi.dFPS - elapsed.count()))); if (c == 27) break;
 	}
 	params.pc = 1;
 	vidProc.join();
+	if (params.breathPos.size() != 0) {
+		std::ofstream breathfile;
+		breathfile.open(metaFile);
+		breathfile << params.breathPos.size() << std::endl;
+		for (int i = 0; i < params.breathPos.size(); i++) {
+			breathfile << params.breathPos[i] << std::endl;
+		}
+		breathfile.close();
+	}
 	cvDestroyWindow(WINDOWNAME);
-	VideoCleanup((LPVOID)params.pvc);
+	VideoCleanup((void*)params.pvc);
 	return 0;
 }

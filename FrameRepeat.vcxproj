@@ -222,7 +222,6 @@ copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\o
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TimelineStatic.h" />
-    <ClInclude Include="Video.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FrameRepeat.cpp" />
@@ -234,6 +233,12 @@ copy "C:\Users\Gregory\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\o
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="TimelineStatic.cpp" />
+    <ClCompile Include="Video.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="FrameRepeat.rc" />
