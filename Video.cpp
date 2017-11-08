@@ -233,8 +233,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		int breaths = 0;
 		for (int i = 0; i < motionDetected.size(); i++) {
 			//log(exp(N) * Value) / N brings normalized value to logarithmic scale with correctly chosen N factor which is big enough to bring all values above 1
+			//log(1+Value) also works
 			double pct = motionDetected[i] / d; if (pct > 1.0) pct = 1.0; if (pct > .10) pct = .10; pct *= 10;
-			pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
+			//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
+			pct = log(1 + pct);
 			if (i != 0 && i != motionDetected.size() - 1 && (motionDetected[i] > motionDetected[i - 1]) && (motionDetected[i] > motionDetected[i + 1])) {
 				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 			} else if (i != 0 && i != motionDetected.size() - 1 && (motionDetected[i] < motionDetected[i - 1]) && (motionDetected[i] < motionDetected[i + 1])) {
@@ -466,7 +468,9 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 						cv::Mat planes[2];
 						cv::split(MultiMat, planes);
 						magnitude(planes[0], planes[1], planes[0]);
-						MultiMat = planes[0].colRange(KpData.cols * .1 / pp.dDesiredFPS - 1, KpData.cols / pp.dDesiredFPS + 1);
+						//first bin in FFT is DC (0 Hz), second bin Fs / N where Fs = sample rate, N = size of FFT 5 / 50 = .1Hz, 25 * 5 / 50 = 1.5Hz
+						//second half > N / 2 is symetrical to first half just complex conjugates
+						MultiMat = planes[0].colRange(KpData.cols * .1 / pp.dDesiredFPS - 1, KpData.cols * .9 / pp.dDesiredFPS + 1);
 						cv::Mat MaxIndexes;
 						cv::Mat Sort = MultiMat.isContinuous() ? MultiMat.reshape(0, 1) : MultiMat.clone().reshape(0, 1);
 						cv::sortIdx(Sort, MaxIndexes, CV_SORT_DESCENDING | CV_SORT_EVERY_ROW);
@@ -501,7 +505,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 					magnitude(planes[0], planes[1], planes[0]);
 					//apply a bandpass filter
 					//tolerance range 1Hz (1 breath per second) to .1Hz (1 breath every 10 seconds)
-					MultiMat = planes[0].colRange(FFTWindow.rows * .1 / pp.dDesiredFPS - 1, FFTWindow.rows / pp.dDesiredFPS + 1);
+					MultiMat = planes[0].colRange(FFTWindow.rows * .1 / pp.dDesiredFPS - 1, FFTWindow.rows * .9 / pp.dDesiredFPS + 1);
 					cv::Mat MaxIndexes;
 					ellipse = MultiMat.isContinuous() ? MultiMat.reshape(0, 1) : MultiMat.clone().reshape(0, 1);
 					cv::sortIdx(ellipse, MaxIndexes, CV_SORT_DESCENDING | CV_SORT_EVERY_ROW);
