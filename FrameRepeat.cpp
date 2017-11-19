@@ -71,9 +71,11 @@ BOOL CFrameRepeatApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	char* szFname[] { "c:\\Users\\Gregory\\Downloads\\00082.MTS" };
-	//char* szFname[] { "c:\\Users\\Gregory\\Downloads\\00086.MTS" };
-	INT_PTR nResponse = main(1, szFname);
+	std::string str(getenv("UserProfile"));
+	//str += "\\Downloads\\00082.MTS";
+	str += "\\Downloads\\00086.MTS";
+	const char* szFname[] { str.data() };
+	INT_PTR nResponse = main(1, (char**)szFname);
 	//CFrameRepeatDlg dlg;
 	//m_pMainWnd = &dlg;
 	//INT_PTR nResponse = dlg.DoModal();

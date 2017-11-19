@@ -227,23 +227,29 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	}
 
 	if (motionDetected.size() != 0) {
-		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin(), motionDetected.end());
-		double d = *dMinMax.second;
+		//total range of motion area is stable, maximum found (probably should only consider a window here as well)
+		//motion detected percentage depends on camera view and if camera moves changes dynamically
+		//in a stable case, it depends on the sharpness of features in breathing region
+		//must filter out oscillation wave based on 2 thresholds
 		cv::Mat timeline = cv::Mat::zeros(30, motionDetected.size(), CV_8UC3);
 		int breaths = 0;
+		double lastpct = 0;
 		for (int i = 0; i < motionDetected.size(); i++) {
+			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin() + (i < 5 ? 0 : (i - 5)), motionDetected.begin() + i + 1);
+			double d = *dMinMax.second;
 			//log(exp(N) * Value) / N brings normalized value to logarithmic scale with correctly chosen N factor which is big enough to bring all values above 1
 			//log(1+Value) also works
-			double pct = motionDetected[i] / d; if (pct > 1.0) pct = 1.0; if (pct > .10) pct = .10; pct *= 10;
+			double pct = d == 0 ? 0 : motionDetected[i] / d; //if (pct > 1.0) pct = 1.0; if (pct > .001) pct = .001; pct *= 1000;
 			//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
-			pct = log(1 + pct);
-			if (i != 0 && i != motionDetected.size() - 1 && (motionDetected[i] > motionDetected[i - 1]) && (motionDetected[i] > motionDetected[i + 1])) {
+			pct = log(1 + pct * (exp(1) - 1));
+			if (i != 0 && (lastpct < 0.25) && (motionDetected[i] > 0.25)) {
 				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
-			} else if (i != 0 && i != motionDetected.size() - 1 && (motionDetected[i] < motionDetected[i - 1]) && (motionDetected[i] < motionDetected[i + 1])) {
+			} else if (i != 0  && (lastpct > 0.25) && (motionDetected[i] < 0.25)) {
 				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
 			} else {
 				timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(255, 255, 255);
 			}
+			lastpct = pct;
 		}
 		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)motionDetected.size()), 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 510, std::min(640, (int)motionDetected.size()), 30)));
@@ -404,11 +410,32 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 					cv::drawContours(mask, contourWindow.front(), -1, cv::Scalar(1), CV_FILLED);
 					cumulativeMask -= mask;
 					contourWindow.erase(contourWindow.begin(), contourWindow.begin() + 1);
-				}				
+				}
+				mask = fgimg.clone();
+				bg.get()->getBackgroundImage(bkgnd);
+				cv::Mat pyramid, err;
+				std::vector<cv::Point2f> pts, lastpts;
+				std::vector<uchar> status;
+				cv::goodFeaturesToTrack(bkgnd, lastpts, 100, 0.3, 7);
+				cv::TermCriteria termcrit(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 20, 0.03);
+				cv::cornerSubPix(bkgnd, lastpts, cv::Size(10, 10), cv::Size(-1, -1), termcrit);
+				cv::buildOpticalFlowPyramid(bkgnd, pyramid, cv::Size(21, 21), 3);
+				//best features are the ones closest to the motion window
+				cv::calcOpticalFlowPyrLK(pyramid, frame, lastpts, pts, status, err);
+				//cv::calcOpticalFlowFarneback(bkgnd, frame, pyramid, 0.5, 3, 15, 3, 5, 1.2, 0);
+				for (int i = 0; i < pts.size(); i++) {
+					if (!status[i]) continue;
+					double dist = cv::norm(pts[i] - lastpts[i]);
+				}
+
+				//cv::calcOpticalFlowSF() //contrib optflow module
 				//could make a convex hull to get a more inclusive shape around the contours...
 				//cv::convexHull()
-				cv::threshold(cumulativeMask, mask, 0, 255, cv::THRESH_BINARY);
+				/*cv::threshold(cumulativeMask, mask, 0, 255, cv::THRESH_BINARY);
 				kps.clear();
+
+				//fourier transform is not particularly applicable because breathing does not have regular frequency or periodicity over short intervals
+				//oscillation can be detected by instead of using peaks and troughs, using a threshold between the minimum and maximum after it has been properly scaled
 
 				//feature point tracking
 				mask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
@@ -489,7 +516,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				lastdescs = descs;
 
 				//color intensity monitoring
-				//build laplacian pyramid and select best image
+				//build laplacian pyramid and select best image?
 				cv::Mat ellipse;
 				cv::bitwise_and(frame, mask, ellipse);
 				FFTWindow.push_back(ellipse.isContinuous() ? ellipse.reshape(0, 1) : ellipse.clone().reshape(0, 1));
@@ -522,7 +549,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 					FFTWindow = cv::Mat(0, pp.iMinWidth * pp.iMinHeight, CV_8UC1);
 					//FFTWindow = FFTWindow.rowRange(1, FFTWindow.rows);
-				}
+				}*/
 
 				if (pf != NULL)
 				{
@@ -651,7 +678,7 @@ int main(int argc, char** argv)
 		params.vi.dwWidthInPixels = params.pvc->get(CV_CAP_PROP_FRAME_WIDTH);
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
-	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, false };
+	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, true };
 	cvSetMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cvCreateTrackbar2(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
 	std::thread vidProc(&VideoProcessor, std::ref(params));
@@ -674,16 +701,16 @@ int main(int argc, char** argv)
 					if (params.pp.noProcessing) break;
 				}
 				if (params.breathPos.size() != 0) {
-					cv::Mat timeline = cv::Mat::zeros(1, idx + 1 / params.pp.dDesiredFPS, CV_8UC3);
+					cv::Mat timeline = cv::Mat::zeros(1, 1 + idx / (int)params.pp.dDesiredFPS, CV_8UC3);
 					int i;
 					for (i = 0; i < params.breathPos.size(); i++) {
 						if (params.breathPos[i] <= idx) 
 							timeline.at<cv::Vec3b>(cv::Point(params.breathPos[i] / params.pp.dDesiredFPS, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
 						else break;
 					}
-					cv::resize(timeline, timeline, cv::Size(std::min(640, idx), 30), cv::INTER_MAX);
+					cv::resize(timeline, timeline, cv::Size(std::min(640, (1 + idx / (int)params.pp.dDesiredFPS)), 30), cv::INTER_MAX);
 
-					timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, idx), 30)));
+					timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, (1 + idx / (int)params.pp.dDesiredFPS)), 30)));
 
 					char buf[256];
 					sprintf(buf, "Breaths: %lu", i / 2);
