@@ -212,7 +212,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 					double pct = (ft[i] - dMin) / (d - dMin);
 					if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
-					} else if (i != 0 && i != ft.size() - 1 && (ft[i] < ft[i - 1]) && (ft[i] <any fi ft[i + 1])) {
+					} else if (i != 0 && i != ft.size() - 1 && (ft[i] < ft[i - 1]) && (ft[i] < ft[i + 1])) {
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); //breaths++;
 					} else {
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
