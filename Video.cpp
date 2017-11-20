@@ -17,6 +17,7 @@
 
 #define TRACKBARNAME "Frame"
 #define WINDOWNAME "VideoOscillation"
+#define PAUSEBTN "PauseBtn"
 
 //for std::map<cv::Point, ...> which is an ordered map
 //unordered_map more appropriate but must make a hash function like x ^ y or using boost::hash_combine to make a hash_value function
@@ -212,7 +213,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 					double pct = (ft[i] - dMin) / (d - dMin);
 					if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
-					} else if (i != 0 && i != ft.size() - 1 && (ft[i] < ft[i - 1]) && (ft[i] <any fi ft[i + 1])) {
+					} else if (i != 0 && i != ft.size() - 1 && (ft[i] < ft[i - 1]) && (ft[i] < ft[i + 1])) {
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); //breaths++;
 					} else {
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
@@ -268,7 +269,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	return canvas;
 }
 
-void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vector<double> & motionDetected, std::vector<double> & oscillations, double & dMaxContourSize, double & dMaxOscillation, std::function<ProgressFunc> pf, int* pCancel, int* iJumpFrame)
+void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vector<double> & motionDetected, std::vector<double> & oscillations, double & dMaxContourSize, double & dMaxOscillation, std::function<ProgressFunc> pf, int* pCancel, int* iJumpFrame, bool* bPaused)
 {
 	cv::Mat frame, fgimg;
 	double dSumContourSize;
@@ -342,6 +343,12 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	matcher = cv::FlannBasedMatcher::create();
 	//matcher = cv::FlannBasedMatcher::FlannBasedMatcher();
 	while (pvc.isOpened()) {
+		if (*bPaused) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+			if (*bPaused) {
+				continue;
+			}
+		}
 		int iJump;
 		if ((iJump = *iJumpFrame) != 0) {
 			*iJumpFrame = 0;
@@ -682,6 +689,7 @@ struct StartParams
 	mutable std::mutex m;
 	int iCurPos;
 	int iJumpFrame;
+	bool bPause;
 	std::vector<int> breathPos;
 	ProcessParams pp;
 };
@@ -696,7 +704,7 @@ void VideoProcessor(StartParams& p)
 		std::lock_guard<std::mutex> lock(p.m);
 		p.imgFrameNum.push(Frame);
 		p.imgQueue.push(mat);
-	})), &p.pc, &p.iJumpFrame);
+	})), &p.pc, &p.iJumpFrame, &p.bPause);
 }
 
 void ChangeVideoPos(int Pos, void* p)
@@ -705,12 +713,19 @@ void ChangeVideoPos(int Pos, void* p)
 		((StartParams*)p)->iJumpFrame = Pos;
 }
 
+void callbackPause(int, void* p)
+{
+	((StartParams*)p)->bPause = !((StartParams*)p)->bPause;
+}
+
 void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 {
+	cv::Rect button(620, (((StartParams*)userdata)->pp.noProcessing ? 480 : 540) + 10, 20, 20);
 	if (event == cv::EVENT_LBUTTONDOWN) {
-		((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
+		if (!button.contains(cv::Point(x, y))) ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
 	} else if (event == cv::EVENT_LBUTTONUP) {
-		((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
+		if (button.contains(cv::Point(x, y))) callbackPause(0, userdata);
+		else ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
 	}
 }
 
@@ -747,8 +762,9 @@ int main(int argc, char** argv)
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
 	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, false };
-	cvSetMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
-	cvCreateTrackbar2(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
+	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
+	cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
+	//cv::createButton(PAUSEBTN, callbackPause, &params, CV_PUSH_BUTTON);
 	std::thread vidProc(&VideoProcessor, std::ref(params));
 	std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
 	while (true) {
@@ -786,6 +802,9 @@ int main(int argc, char** argv)
 					int baseLine = 0;
 					cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 					cv::putText(mat, cv::String(buf), cv::Point((640 - s.width) / 2, (params.pp.noProcessing ? 480 : 540) + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+					cv::Rect button(620, (params.pp.noProcessing ? 480 : 540) + 10, 20, 20);
+					mat(button) = cv::Vec3b(200, 200, 200);
+					cv::putText(mat(button), cv::String("\""), cv::Point(2, 27), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 0), 3);
 				}
 				cvSetTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
 				cv::imshow(WINDOWNAME, mat);
