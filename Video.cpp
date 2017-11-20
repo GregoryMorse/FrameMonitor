@@ -690,6 +690,9 @@ struct StartParams
 	int iCurPos;
 	int iJumpFrame;
 	bool bPause;
+	double playbackRate;
+	std::chrono::time_point<std::chrono::high_resolution_clock> start;
+	std::chrono::time_point<std::chrono::high_resolution_clock> pausedat;
 	std::vector<int> breathPos;
 	ProcessParams pp;
 };
@@ -711,21 +714,37 @@ void ChangeVideoPos(int Pos, void* p)
 {
 	if (((StartParams*)p)->iCurPos != Pos)
 		((StartParams*)p)->iJumpFrame = Pos;
+	if (((StartParams*)p)->pp.noProcessing) {
+		std::vector<int> fixBreath;
+		std::copy_if(((StartParams*)p)->breathPos.begin(), ((StartParams*)p)->breathPos.end(), std::back_inserter(fixBreath), [Pos](int i) { return i <= Pos; });
+		if (fixBreath.size() % 2 == 1) fixBreath.pop_back();
+		((StartParams*)p)->breathPos = fixBreath;
+	}
 }
 
 void callbackPause(int, void* p)
 {
 	((StartParams*)p)->bPause = !((StartParams*)p)->bPause;
+	if (((StartParams*)p)->bPause) ((StartParams*)p)->pausedat = std::chrono::high_resolution_clock::now();
+	else ((StartParams*)p)->start += (std::chrono::high_resolution_clock::now() - ((StartParams*)p)->pausedat);
 }
 
 void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 {
-	cv::Rect button(620, (((StartParams*)userdata)->pp.noProcessing ? 480 : 540) + 10, 20, 20);
+	cv::Rect button(620, 10, 20, 60);
 	if (event == cv::EVENT_LBUTTONDOWN) {
 		if (!button.contains(cv::Point(x, y))) ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
 	} else if (event == cv::EVENT_LBUTTONUP) {
-		if (button.contains(cv::Point(x, y))) callbackPause(0, userdata);
-		else ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
+		if (button.contains(cv::Point(x, y))) {
+			if (y < 30) callbackPause(0, userdata);
+			else if (y < 50) {
+				((StartParams*)userdata)->playbackRate *= 2;
+				((StartParams*)userdata)->start -= (std::chrono::high_resolution_clock::now() - ((StartParams*)userdata)->start);
+			} else {
+				((StartParams*)userdata)->playbackRate /= 2;
+				((StartParams*)userdata)->start += (std::chrono::high_resolution_clock::now() - ((StartParams*)userdata)->start) / 2;
+			}
+		} else ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
 	}
 }
 
@@ -761,12 +780,14 @@ int main(int argc, char** argv)
 		params.vi.dwWidthInPixels = params.pvc->get(CV_CAP_PROP_FRAME_WIDTH);
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
-	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, false };
+	params.playbackRate = 1000;
+	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, true };
+	if (params.pp.noProcessing) params.breathPos.clear();
 	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
 	//cv::createButton(PAUSEBTN, callbackPause, &params, CV_PUSH_BUTTON);
 	std::thread vidProc(&VideoProcessor, std::ref(params));
-	std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
+	params.start = std::chrono::high_resolution_clock::now();
 	while (true) {
 		//locking scope, not a unique_lock because only used once
 		{
@@ -784,6 +805,7 @@ int main(int argc, char** argv)
 					params.imgQueue.pop();
 					if (params.pp.noProcessing) break;
 				}
+				char buf[256];
 				if (params.breathPos.size() != 0) {
 					double dScale = 1;// params.pp.dDesiredFPS / params.vi.dFPS;
 					cv::Mat timeline = cv::Mat::zeros(1, 1 + idx * dScale, CV_8UC3);
@@ -797,22 +819,30 @@ int main(int argc, char** argv)
 
 					timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, (1 + (int)(idx * dScale))), 30)));
 
-					char buf[256];
 					sprintf(buf, "Breaths: %lu", i / 2);
 					int baseLine = 0;
 					cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 					cv::putText(mat, cv::String(buf), cv::Point((640 - s.width) / 2, (params.pp.noProcessing ? 480 : 540) + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
-					cv::Rect button(620, (params.pp.noProcessing ? 480 : 540) + 10, 20, 20);
-					mat(button) = cv::Vec3b(200, 200, 200);
-					cv::putText(mat(button), cv::String("\""), cv::Point(2, 27), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 0), 3);
 				}
+				cv::Rect button(620, 10, 20, 20);
+				mat(button) = cv::Vec3b(200, 200, 200);
+				cv::putText(mat(button), cv::String("\""), cv::Point(2, 27), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 0), 3);
+				button = cv::Rect(620, 30, 20, 20);
+				mat(button) = cv::Vec3b(200, 200, 200);
+				cv::putText(mat(button), cv::String("+"), cv::Point(4, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
+				button = cv::Rect(620, 50, 20, 20);
+				mat(button) = cv::Vec3b(200, 200, 200);
+				cv::putText(mat(button), cv::String("-"), cv::Point(4, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
+				button = cv::Rect(580, 70, 60, 20);
+				sprintf(buf, "x%.2f", 1000 / params.playbackRate);
+				cv::putText(mat(button), cv::String(buf), cv::Point(0, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255), 1);
+				
 				cvSetTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
 				cv::imshow(WINDOWNAME, mat);
 			}
 		}
-		std::chrono::duration<double, std::milli> elapsed = std::chrono::high_resolution_clock::now() - start;
-		//2000 would be half speed, etc should be a speed parameter...
-		int c = cvWaitKey(std::max(1, (int)(1000 * params.iCurPos / params.vi.dFPS - elapsed.count()))); if (c == 27) break;
+		std::chrono::duration<double, std::milli> elapsed = std::chrono::high_resolution_clock::now() - params.start;
+		int c = cvWaitKey(std::max(1, (int)(params.playbackRate * params.iCurPos / params.vi.dFPS - elapsed.count()))); if (c == 27) break;
 	}
 	params.pc = 1;
 	vidProc.join();
