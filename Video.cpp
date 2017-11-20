@@ -350,9 +350,9 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 			}
 		}
 		int iJump;
-		if ((iJump = *iJumpFrame) != 0) {
-			*iJumpFrame = 0;
-			pvc.set(CV_CAP_PROP_POS_FRAMES, (iJump > frameHistory) ? iJump - frameHistory : 0); //CV_CAP_PROP_POS_MSEC
+		if ((iJump = *iJumpFrame) != -1) {
+			*iJumpFrame = -1;
+			pvc.set(CV_CAP_PROP_POS_FRAMES, pp.noProcessing ? iJump : ((iJump > frameHistory) ? iJump - frameHistory : 0)); //CV_CAP_PROP_POS_MSEC
 			bg = pp.bMOG ? (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorMOG2(frameHistory, pp.threshold, pp.bShadowDetection) : (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorKNN(frameHistory, pp.threshold, pp.bShadowDetection);
 			if (pp.bMOG) {
 				((cv::BackgroundSubtractorMOG2*)bg.get())->setNMixtures(pp.nMixtures);
@@ -688,7 +688,7 @@ struct StartParams
 	std::queue<int> imgFrameNum;
 	mutable std::mutex m;
 	int iCurPos;
-	int iJumpFrame;
+	int iJumpFrame = -1;
 	bool bPause;
 	double playbackRate;
 	std::chrono::time_point<std::chrono::high_resolution_clock> start;
@@ -701,9 +701,10 @@ void VideoProcessor(StartParams& p)
 {
 	ProcessVideo(p.vi, p.pp, *p.pvc, p.motionDetect, p.osc, p.dMaxContour, p.dMaxOsc,
 		std::move(std::function<ProgressFunc>([&p](cv::Mat mat, int Frame) -> void {
-		while (p.imgQueue.size() > 10 && !p.pc) {
+		while (p.imgQueue.size() > 10 && !p.pc && p.iJumpFrame == -1) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
+		if (p.iJumpFrame != -1) return;
 		std::lock_guard<std::mutex> lock(p.m);
 		p.imgFrameNum.push(Frame);
 		p.imgQueue.push(mat);
@@ -712,13 +713,18 @@ void VideoProcessor(StartParams& p)
 
 void ChangeVideoPos(int Pos, void* p)
 {
-	if (((StartParams*)p)->iCurPos != Pos)
+	if (((StartParams*)p)->iCurPos != Pos) {
 		((StartParams*)p)->iJumpFrame = Pos;
-	if (((StartParams*)p)->pp.noProcessing) {
-		std::vector<int> fixBreath;
-		std::copy_if(((StartParams*)p)->breathPos.begin(), ((StartParams*)p)->breathPos.end(), std::back_inserter(fixBreath), [Pos](int i) { return i <= Pos; });
-		if (fixBreath.size() % 2 == 1) fixBreath.pop_back();
-		((StartParams*)p)->breathPos = fixBreath;
+		if (((StartParams*)p)->pp.noProcessing) {
+			std::vector<int> fixBreath;
+			std::copy_if(((StartParams*)p)->breathPos.begin(), ((StartParams*)p)->breathPos.end(), std::back_inserter(fixBreath), [Pos](int i) { return i <= Pos; });
+			if (fixBreath.size() % 2 == 1) fixBreath.pop_back();
+			((StartParams*)p)->breathPos = fixBreath;
+		}
+		((StartParams*)p)->start = std::chrono::high_resolution_clock::now() - std::chrono::milliseconds((int)(((StartParams*)p)->playbackRate * Pos / ((StartParams*)p)->vi.dFPS));
+		std::lock_guard<std::mutex> lock(((StartParams*)p)->m);
+		((StartParams*)p)->imgQueue = std::queue<cv::Mat>();
+		((StartParams*)p)->imgFrameNum = std::queue<int>();
 	}
 }
 
@@ -789,12 +795,12 @@ int main(int argc, char** argv)
 	std::thread vidProc(&VideoProcessor, std::ref(params));
 	params.start = std::chrono::high_resolution_clock::now();
 	while (true) {
+		int idx = -1;
+		cv::Mat mat;
 		//locking scope, not a unique_lock because only used once
 		{
 			std::lock_guard<std::mutex> lock(params.m);
 			if (params.imgQueue.size() != 0) {
-				cv::Mat mat;
-				int idx = -1; 
 				while (params.imgQueue.size() != 0) {
 					int nextIdx = params.imgFrameNum.front();
 					params.imgFrameNum.pop();
@@ -805,44 +811,46 @@ int main(int argc, char** argv)
 					params.imgQueue.pop();
 					if (params.pp.noProcessing) break;
 				}
-				char buf[256];
-				if (params.breathPos.size() != 0) {
-					double dScale = 1;// params.pp.dDesiredFPS / params.vi.dFPS;
-					cv::Mat timeline = cv::Mat::zeros(1, 1 + idx * dScale, CV_8UC3);
-					int i;
-					for (i = 0; i < params.breathPos.size(); i++) {
-						if (params.breathPos[i] <= idx)
-							timeline.at<cv::Vec3b>(cv::Point(params.breathPos[i] * dScale, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
-						else break;
-					}
-					cv::resize(timeline, timeline, cv::Size(std::min(640, (1 + (int)(idx * dScale))), 30), cv::INTER_MAX);
-
-					timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, (1 + (int)(idx * dScale))), 30)));
-
-					sprintf(buf, "Breaths: %lu", i / 2);
-					int baseLine = 0;
-					cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-					cv::putText(mat, cv::String(buf), cv::Point((640 - s.width) / 2, (params.pp.noProcessing ? 480 : 540) + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
-				}
-				cv::Rect button(620, 10, 20, 20);
-				mat(button) = cv::Vec3b(200, 200, 200);
-				cv::putText(mat(button), cv::String("\""), cv::Point(2, 27), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 0), 3);
-				button = cv::Rect(620, 30, 20, 20);
-				mat(button) = cv::Vec3b(200, 200, 200);
-				cv::putText(mat(button), cv::String("+"), cv::Point(4, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
-				button = cv::Rect(620, 50, 20, 20);
-				mat(button) = cv::Vec3b(200, 200, 200);
-				cv::putText(mat(button), cv::String("-"), cv::Point(4, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
-				button = cv::Rect(580, 70, 60, 20);
-				sprintf(buf, "x%.2f", 1000 / params.playbackRate);
-				cv::putText(mat(button), cv::String(buf), cv::Point(0, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255), 1);
-				
-				cvSetTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
-				cv::imshow(WINDOWNAME, mat);
 			}
 		}
+		if (idx != -1) {
+			char buf[256];
+			if (params.breathPos.size() != 0) {
+				double dScale = 1;// params.pp.dDesiredFPS / params.vi.dFPS;
+				cv::Mat timeline = cv::Mat::zeros(1, 1 + idx * dScale, CV_8UC3);
+				int i;
+				for (i = 0; i < params.breathPos.size(); i++) {
+					if (params.breathPos[i] <= idx)
+						timeline.at<cv::Vec3b>(cv::Point(params.breathPos[i] * dScale, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
+					else break;
+				}
+				cv::resize(timeline, timeline, cv::Size(std::min(640, (1 + (int)(idx * dScale))), 30), cv::INTER_MAX);
+
+				timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, (1 + (int)(idx * dScale))), 30)));
+
+				sprintf(buf, "Breaths: %lu", i / 2);
+				int baseLine = 0;
+				cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+				cv::putText(mat, cv::String(buf), cv::Point((640 - s.width) / 2, (params.pp.noProcessing ? 480 : 540) + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+			}
+			cv::Rect button(620, 10, 20, 20);
+			mat(button) = cv::Vec3b(200, 200, 200);
+			cv::putText(mat(button), cv::String("\""), cv::Point(2, 27), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 0), 3);
+			button = cv::Rect(620, 30, 20, 20);
+			mat(button) = cv::Vec3b(200, 200, 200);
+			cv::putText(mat(button), cv::String("+"), cv::Point(4, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
+			button = cv::Rect(620, 50, 20, 20);
+			mat(button) = cv::Vec3b(200, 200, 200);
+			cv::putText(mat(button), cv::String("-"), cv::Point(4, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0), 3);
+			button = cv::Rect(580, 70, 60, 20);
+			sprintf(buf, "x%.2f", 1000 / params.playbackRate);
+			cv::putText(mat(button), cv::String(buf), cv::Point(0, 18), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255), 1);
+				
+			cvSetTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
+			cv::imshow(WINDOWNAME, mat);
+		}
 		std::chrono::duration<double, std::milli> elapsed = std::chrono::high_resolution_clock::now() - params.start;
-		int c = cvWaitKey(std::max(1, (int)(params.playbackRate * params.iCurPos / params.vi.dFPS - elapsed.count()))); if (c == 27) break;
+		int c = cvWaitKey(idx == -1 ? 1 : std::max(1, (int)(params.playbackRate * params.iCurPos / params.vi.dFPS - elapsed.count()))); if (c == 27) break;
 	}
 	params.pc = 1;
 	vidProc.join();
