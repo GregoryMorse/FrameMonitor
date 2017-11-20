@@ -164,18 +164,19 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	}
 
 	if (oscillations.size() != 0) {
-		double dMaxOsc = 0;
+		double dMaxOsc = -1 * std::numeric_limits<double>::infinity(), dMinOsc = std::numeric_limits<double>::infinity();
 		cv::Mat timeline = cv::Mat::zeros(30, std::max(640, (int)oscillations.size()), CV_8UC3);
 		for (int i = 0; i < oscCount.size(); i++) {
 			if (oscCount[i] != 0) {
 				dMaxOsc = std::max(oscillations[i] / oscCount[i], dMaxOsc);
+				dMinOsc = std::min(oscillations[i] / oscCount[i], dMinOsc);
 			}
 		}
 		int breaths = 0;
 		if (dMaxOsc != 0) {
 			for (int i = 0; i < oscillations.size(); i++) {
 				if (oscCount[i] != 0) {
-					double pct = (oscillations[i] / oscCount[i]) / dMaxOsc;
+					double pct = ((oscillations[i] / oscCount[i]) - dMinOsc) / (dMaxOsc - dMinOsc);
 					if (i != 0 && i != oscillations.size() - 1 && (oscillations[i] / oscCount[i]) > (oscillations[i - 1] / oscCount[i - 1]) && (oscillations[i] / oscCount[i]) > (oscillations[i + 1] / oscCount[i + 1])) {
 						timeline.at<cv::Vec3b>(cv::Point(i, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 					} else if (i != 0 && i != oscillations.size() - 1 && (oscillations[i] / oscCount[i]) < (oscillations[i - 1] / oscCount[i - 1]) && (oscillations[i] / oscCount[i]) < (oscillations[i + 1] / oscCount[i + 1])) {
@@ -326,6 +327,12 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	featDetector = cv::xfeatures2d::SURF::create();
 	((cv::xfeatures2d::SURF*)featDetector.get())->setHessianThreshold(2000);
 	
+	cv::Mat err;
+	std::vector<cv::Mat> pyramid;
+	std::vector<cv::Point2f> pts, lastpts, nextpts;
+	std::vector<uchar> status, nextstatus;
+	cv::TermCriteria termcrit(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 20, 0.03);
+
 	time_t start = time(NULL);
 	//cv::BFMatcher::create();
 	matcher = cv::FlannBasedMatcher::create();
@@ -413,20 +420,30 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				}
 				mask = fgimg.clone();
 				bg.get()->getBackgroundImage(bkgnd);
-				cv::Mat pyramid, err;
-				std::vector<cv::Point2f> pts, lastpts;
-				std::vector<uchar> status;
-				cv::goodFeaturesToTrack(bkgnd, lastpts, 100, 0.3, 7);
-				cv::TermCriteria termcrit(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 20, 0.03);
-				cv::cornerSubPix(bkgnd, lastpts, cv::Size(10, 10), cv::Size(-1, -1), termcrit);
-				cv::buildOpticalFlowPyramid(bkgnd, pyramid, cv::Size(21, 21), 3);
+				if (oscillations.size() % frameHistory == 0) {
+					cv::goodFeaturesToTrack(bkgnd, lastpts, 100, 0.3, 7);
+					cv::cornerSubPix(bkgnd, lastpts, cv::Size(10, 10), cv::Size(-1, -1), termcrit);
+					cv::buildOpticalFlowPyramid(bkgnd, pyramid, cv::Size(21, 21), 3);
+				}
 				//best features are the ones closest to the motion window
 				cv::calcOpticalFlowPyrLK(pyramid, frame, lastpts, pts, status, err);
+				if (oscillations.size() % frameHistory == 0) { nextstatus = status; nextpts = pts; }
 				//cv::calcOpticalFlowFarneback(bkgnd, frame, pyramid, 0.5, 3, 15, 3, 5, 1.2, 0);
+				double totaldist = 0, totalneg = 0;
+				int totalosc = 0;
 				for (int i = 0; i < pts.size(); i++) {
-					if (!status[i]) continue;
-					double dist = cv::norm(pts[i] - lastpts[i]);
+					if (!status[i] || !nextstatus[i]) continue;
+					totalosc++;
+					double dist = cv::norm(pts[i] - nextpts[i]);
+					//based on reference point - either fixed in image preferably by gravity vector but hard to determine
+					//or based on point in background image, must determine which are positive and negative distance contributors
+					if (cv::norm(pts[i] - lastpts[i]) > cv::norm(nextpts[i] - lastpts[i])) totaldist += dist;
+					else totalneg += dist;
 				}
+				nextstatus = status;
+				nextpts = pts;
+				oscillations.push_back(totaldist - totalneg);
+				oscCount.push_back(totalosc);
 
 				//cv::calcOpticalFlowSF() //contrib optflow module
 				//could make a convex hull to get a more inclusive shape around the contours...
@@ -583,6 +600,14 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 						std::transform(lastkps.begin(), lastkps.end(), std::back_inserter(kpoints), [pp, vi](cv::KeyPoint& v) { return cv::KeyPoint(cv::Point2f(v.pt.x * vi.dwWidthInPixels / pp.iMinWidth, v.pt.y * vi.dwHeightInPixels / pp.iMinHeight), v.size * vi.dwWidthInPixels / pp.iMinWidth, v.angle, v.response, v.octave, v.class_id); });
 						cv::drawKeypoints(detFrame, kpoints, detFrame);
 					} else cv::drawKeypoints(detFrame, lastkps, detFrame);
+
+					for (int i = 0; i < pts.size(); i++) {
+						if (!status[i]) continue;
+						if (pp.iMinHeight != 0 || pp.iMinWidth != 0) {
+							cv::circle(detFrame, cv::Point2f(pts[i].x * vi.dwWidthInPixels / pp.iMinWidth, pts[i].y * vi.dwHeightInPixels / pp.iMinHeight), 5, cv::Scalar(255, 0, 0), 2);
+						} else cv::circle(detFrame, pts[i], 5, cv::Scalar(255, 0, 0), 2);
+					}
+
 					//cv::drawMatches(frame, kps, frame, kps, matches, frame);
 
 					//cvtColor(detFrame, detFrame, CV_BGR2RGB);
@@ -678,7 +703,7 @@ int main(int argc, char** argv)
 		params.vi.dwWidthInPixels = params.pvc->get(CV_CAP_PROP_FRAME_WIDTH);
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
-	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, true };
+	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, false };
 	cvSetMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cvCreateTrackbar2(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
 	std::thread vidProc(&VideoProcessor, std::ref(params));

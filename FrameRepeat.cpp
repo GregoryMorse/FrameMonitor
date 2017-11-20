@@ -72,8 +72,8 @@ BOOL CFrameRepeatApp::InitInstance()
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
 	std::string str(getenv("UserProfile"));
-	//str += "\\Downloads\\00082.MTS";
-	str += "\\Downloads\\00086.MTS";
+	str += "\\Downloads\\00082.MTS";
+	//str += "\\Downloads\\00086.MTS";
 	const char* szFname[] { str.data() };
 	INT_PTR nResponse = main(1, (char**)szFname);
 	//CFrameRepeatDlg dlg;
