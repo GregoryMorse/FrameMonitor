@@ -180,8 +180,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 				if (oscCount[i] != 0) {
 					double pct = (dMaxOsc - dMinOsc) == 0 ? 0 : ((oscillations[i] / oscCount[i]) - dMinOsc) / (dMaxOsc - dMinOsc);
 					if (i != 0 && lastpct < 0.25 && pct > 0.25) {
+						cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
 						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 					} else if (i != 0 && lastpct > 0.25 && pct < 0.25) {
+						cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
 						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(0, 255, 0); //breaths++;
 					} else {
 						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
@@ -212,8 +214,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 				if (ft[i] != 0) {
 					double pct = (ft[i] - dMin) / (d - dMin);
 					if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
+						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 					} else if (i != 0 && i != ft.size() - 1 && (ft[i] < ft[i - 1]) && (ft[i] < ft[i + 1])) {
+						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); //breaths++;
 					} else {
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
@@ -248,8 +252,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
 			pct = log(1 + pct * (exp(1) - 1));
 			if (i != 0 && (i != motionDetected.size() - 1) && motionDetected[i] > motionDetected[i - 1] && motionDetected[i] > motionDetected[i + 1]) {
+				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
 				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 			} else if (i != 0 && (i != motionDetected.size() - 1) && motionDetected[i] < motionDetected[i - 1] && motionDetected[i] < motionDetected[i + 1]) {
+				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
 				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); //breaths++;
 			} else {
 				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
@@ -744,11 +750,11 @@ void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 		if (button.contains(cv::Point(x, y))) {
 			if (y < 30) callbackPause(0, userdata);
 			else if (y < 50) {
-				((StartParams*)userdata)->playbackRate *= 2;
-				((StartParams*)userdata)->start -= (std::chrono::high_resolution_clock::now() - ((StartParams*)userdata)->start);
-			} else {
 				((StartParams*)userdata)->playbackRate /= 2;
 				((StartParams*)userdata)->start += (std::chrono::high_resolution_clock::now() - ((StartParams*)userdata)->start) / 2;
+			} else {
+				((StartParams*)userdata)->playbackRate *= 2;
+				((StartParams*)userdata)->start -= (std::chrono::high_resolution_clock::now() - ((StartParams*)userdata)->start);
 			}
 		} else ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
 	}
@@ -787,7 +793,7 @@ int main(int argc, char** argv)
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
 	params.playbackRate = 1000;
-	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, true };
+	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, false };
 	if (params.pp.noProcessing) params.breathPos.clear();
 	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
