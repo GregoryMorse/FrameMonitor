@@ -11,6 +11,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <chrono>
 #include <thread>
+#if defined(_WIN32) || defined(_WIN64) || defined(_WINDOWS)
+#include <numeric>
+#else
+#include <algorithm>
+#endif
 #include <mutex>
 #include "opencv2/opencv.hpp"
 #include "opencv2/xfeatures2d.hpp"
@@ -177,32 +182,34 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
 		cv::Mat timeline = cv::Mat::zeros(30, std::max(640, (int)(oscillations.size() * 1)), CV_8UC3);
 		int breaths = 0;
+		//normalizing and smoothing could be generalized to a transform lambda with mutable capture accumulating?
 		//if (dMaxOsc != 0) {
 			double lastpct = 0;
-			for (int i = 0; i < oscillations.size(); i++) {
-				double dMaxOsc = -1 * std::numeric_limits<double>::infinity(), dMinOsc = std::numeric_limits<double>::infinity();
-				for (int j = std::max(0, i - 25); j < std::min(i + 25, (int)oscCount.size()); j++) {
-					if (oscCount[i] != 0) {
-						dMaxOsc = std::max(oscillations[j] / oscCount[j], dMaxOsc);
-						dMinOsc = std::min(oscillations[j] / oscCount[j], dMinOsc);
-					}
+			std::vector<double> vals;
+			std::vector<int> v(oscillations.size());
+			std::iota(v.begin(), v.end(), 0);
+			std::transform(v.begin(), v.end(), std::back_inserter(vals),
+				[oscillations, oscCount](int idx) ->
+				double { return oscCount[idx] == 0 ? 0: oscillations[idx] / oscCount[idx]; });
+			std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
+			std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals](int idx) ->
+				std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
+			{ return std::minmax_element(vals.begin() + std::max(0, idx - 25), vals.begin() + std::min(idx + 25, (int)vals.size())); });
+			std::vector<double> pcts;
+			std::transform(v.begin(), v.end(), std::back_inserter(pcts), [vals, minmaxes, &measurement, &kf](int idx) ->
+				double { measurement.at<float>(0) = *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); kf.correct(measurement); return kf.predict().at<float>(0); });
+			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
+			for (int i = 0; i < vals.size(); i++) {
+				double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
+				if (i != 0 && lastpct < 0.5 && pct > 0.5) {
+					cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
+					breaths++;
+				} else if (i != 0 && lastpct > 0.5 && pct < 0.5) {
+					cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
+					breaths++;
 				}
-				if (oscCount[i] != 0) {
-					measurement.at<float>(0) = oscillations[i] / oscCount[i];
-					kf.correct(measurement);
-					double pct = (dMaxOsc - dMinOsc) == 0 ? 0 : (kf.predict().at<float>(0) - dMinOsc) / (dMaxOsc - dMinOsc);
-					if (pct < 0) pct = 0; if (pct > 1) pct = 1;
-					if (i != 0 && lastpct < 0.45 && pct > 0.45) {
-						cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
-						breaths++;
-					} else if (i != 0 && lastpct > 0.45 && pct < 0.45) {
-						cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
-						breaths++;
-					}
-					timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
-					lastpct = pct;
-				}
-				else lastpct = 0;
+				timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
+				lastpct = pct;
 			}
 		//}
 		if (oscillations.size() * 1 > 640) cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
@@ -803,7 +810,7 @@ int main(int argc, char** argv)
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
 	params.playbackRate = 1000;
-	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 5, 0, 0, true, true, true, false };
+	params.pp = ProcessParams{ true, 800, 600, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, false };
 	if (params.pp.noProcessing) params.breathPos.clear();
 	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
