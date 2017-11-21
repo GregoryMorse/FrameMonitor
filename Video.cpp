@@ -165,6 +165,16 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	}
 
 	if (oscillations.size() != 0) {
+		//how to smooth the jagged data - sliding window average, Kalman filter
+		cv::KalmanFilter kf(2, 1, 0);
+		cv::Mat state(2, 1, CV_32F);
+		cv::Mat processNoise(2, 1, CV_32F);
+		cv::Mat measurement = cv::Mat::zeros(1, 1, CV_32F);
+		kf.transitionMatrix = (cv::Mat_<float>(2, 2) << 1, 1, 0, 1);
+		cv::setIdentity(kf.measurementMatrix);
+		cv::setIdentity(kf.processNoiseCov, cv::Scalar::all(1e-5));
+		cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
+		cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
 		double dMaxOsc = -1 * std::numeric_limits<double>::infinity(), dMinOsc = std::numeric_limits<double>::infinity();
 		cv::Mat timeline = cv::Mat::zeros(30, std::max(640, (int)(oscillations.size() * 1)), CV_8UC3);
 		for (int i = 0; i < oscCount.size(); i++) {
@@ -178,13 +188,15 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			double lastpct = 0;
 			for (int i = 0; i < oscillations.size(); i++) {
 				if (oscCount[i] != 0) {
-					double pct = (dMaxOsc - dMinOsc) == 0 ? 0 : ((oscillations[i] / oscCount[i]) - dMinOsc) / (dMaxOsc - dMinOsc);
-					if (i != 0 && lastpct < 0.25 && pct > 0.25) {
+					measurement.at<float>(0) = oscillations[i] / oscCount[i];
+					kf.correct(measurement);
+					double pct = (dMaxOsc - dMinOsc) == 0 ? 0 : (kf.predict().at<float>(0) - dMinOsc) / (dMaxOsc - dMinOsc);
+					if (i != 0 && lastpct < 0.45 && pct > 0.45) {
 						cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
 						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
-					} else if (i != 0 && lastpct > 0.25 && pct < 0.25) {
+					} else if (i != 0 && lastpct > 0.45 && pct < 0.45) {
 						cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
-						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(0, 255, 0); //breaths++;
+						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
 					} else {
 						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
 					}
@@ -218,7 +230,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 					} else if (i != 0 && i != ft.size() - 1 && (ft[i] < ft[i - 1]) && (ft[i] < ft[i + 1])) {
 						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
-						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); //breaths++;
+						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
 					} else {
 						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
 					}
@@ -256,7 +268,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
 			} else if (i != 0 && (i != motionDetected.size() - 1) && motionDetected[i] < motionDetected[i - 1] && motionDetected[i] < motionDetected[i + 1]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
-				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); //breaths++;
+				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
 			} else {
 				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
 			}
@@ -756,7 +768,7 @@ void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 				((StartParams*)userdata)->playbackRate *= 2;
 				((StartParams*)userdata)->start -= (std::chrono::high_resolution_clock::now() - ((StartParams*)userdata)->start);
 			}
-		} else ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
+		} else if (((StartParams*)userdata)->pp.noProcessing) ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
 	}
 }
 
@@ -860,7 +872,7 @@ int main(int argc, char** argv)
 	}
 	params.pc = 1;
 	vidProc.join();
-	if (params.breathPos.size() != 0) {
+	if (params.pp.noProcessing && params.breathPos.size() != 0) {
 		std::ofstream breathfile;
 		breathfile.open(metaFile);
 		breathfile << params.breathPos.size() << std::endl;
