@@ -175,36 +175,36 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		cv::setIdentity(kf.processNoiseCov, cv::Scalar::all(1e-5));
 		cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
 		cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
-		double dMaxOsc = -1 * std::numeric_limits<double>::infinity(), dMinOsc = std::numeric_limits<double>::infinity();
 		cv::Mat timeline = cv::Mat::zeros(30, std::max(640, (int)(oscillations.size() * 1)), CV_8UC3);
-		for (int i = 0; i < oscCount.size(); i++) {
-			if (oscCount[i] != 0) {
-				dMaxOsc = std::max(oscillations[i] / oscCount[i], dMaxOsc);
-				dMinOsc = std::min(oscillations[i] / oscCount[i], dMinOsc);
-			}
-		}
 		int breaths = 0;
-		if (dMaxOsc != 0) {
+		//if (dMaxOsc != 0) {
 			double lastpct = 0;
 			for (int i = 0; i < oscillations.size(); i++) {
+				double dMaxOsc = -1 * std::numeric_limits<double>::infinity(), dMinOsc = std::numeric_limits<double>::infinity();
+				for (int j = std::max(0, i - 25); j < std::min(i + 25, (int)oscCount.size()); j++) {
+					if (oscCount[i] != 0) {
+						dMaxOsc = std::max(oscillations[j] / oscCount[j], dMaxOsc);
+						dMinOsc = std::min(oscillations[j] / oscCount[j], dMinOsc);
+					}
+				}
 				if (oscCount[i] != 0) {
 					measurement.at<float>(0) = oscillations[i] / oscCount[i];
 					kf.correct(measurement);
 					double pct = (dMaxOsc - dMinOsc) == 0 ? 0 : (kf.predict().at<float>(0) - dMinOsc) / (dMaxOsc - dMinOsc);
+					if (pct < 0) pct = 0; if (pct > 1) pct = 1;
 					if (i != 0 && lastpct < 0.45 && pct > 0.45) {
 						cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
-						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
+						breaths++;
 					} else if (i != 0 && lastpct > 0.45 && pct < 0.45) {
 						cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
-						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
-					} else {
-						timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
+						breaths++;
 					}
+					timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
 					lastpct = pct;
 				}
 				else lastpct = 0;
 			}
-		}
+		//}
 		if (oscillations.size() * 1 > 640) cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 450, 640, 30)));
 
@@ -227,13 +227,12 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 					double pct = (ft[i] - dMin) / (d - dMin);
 					if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
 						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
-						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
+						breaths++;
 					} else if (i != 0 && i != ft.size() - 1 && (ft[i] < ft[i - 1]) && (ft[i] < ft[i + 1])) {
 						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
-						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
-					} else {
-						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
+						breaths++;
 					}
+					timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
 				}
 			}
 		}
@@ -265,13 +264,12 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			pct = log(1 + pct * (exp(1) - 1));
 			if (i != 0 && (i != motionDetected.size() - 1) && motionDetected[i] > motionDetected[i - 1] && motionDetected[i] > motionDetected[i + 1]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
-				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 0, 255); breaths++;
+				breaths++;
 			} else if (i != 0 && (i != motionDetected.size() - 1) && motionDetected[i] < motionDetected[i - 1] && motionDetected[i] < motionDetected[i + 1]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
-				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(0, 255, 0); breaths++;
-			} else {
-				timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
+				breaths++;
 			}
+			timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
 			lastpct = pct;
 		}
 		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(motionDetected.size() * dScale)), 30), cv::INTER_MAX);
