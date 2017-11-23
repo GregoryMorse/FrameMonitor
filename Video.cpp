@@ -130,6 +130,23 @@ double get_oscillation(std::vector<cv::KeyPoint> kpoints, cv::Point2f ReferenceP
 	return 0;
 }
 
+void SmoothData(std::vector<int> & v, std::vector<double> & vals,
+	std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> & minmaxes,
+	std::vector<double> & pcts)
+{
+	cv::KalmanFilter kf(2, 1, 0);
+	cv::Mat state(2, 1, CV_32F);
+	cv::Mat processNoise(2, 1, CV_32F);
+	cv::Mat measurement = cv::Mat::zeros(1, 1, CV_32F);
+	kf.transitionMatrix = (cv::Mat_<float>(2, 2) << 1, 1, 0, 1);
+	cv::setIdentity(kf.measurementMatrix);
+	cv::setIdentity(kf.processNoiseCov, cv::Scalar::all(1e-5));
+	cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
+	cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
+	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [vals, minmaxes, &measurement, &kf](int idx) ->
+		double { measurement.at<float>(0) = *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); kf.correct(measurement); return kf.predict().at<float>(0); });
+}
+
 cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> & motionDetected, std::vector<double> & oscillations, std::vector<double> & oscCount, double dMaxContourSize,
 	int frameNum, int framesPerSecond, time_t startTime, std::vector<double> & ft, double dScale)
 {
@@ -171,15 +188,6 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 
 	if (oscillations.size() != 0) {
 		//how to smooth the jagged data - sliding window average, Kalman filter
-		cv::KalmanFilter kf(2, 1, 0);
-		cv::Mat state(2, 1, CV_32F);
-		cv::Mat processNoise(2, 1, CV_32F);
-		cv::Mat measurement = cv::Mat::zeros(1, 1, CV_32F);
-		kf.transitionMatrix = (cv::Mat_<float>(2, 2) << 1, 1, 0, 1);
-		cv::setIdentity(kf.measurementMatrix);
-		cv::setIdentity(kf.processNoiseCov, cv::Scalar::all(1e-5));
-		cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
-		cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
 		cv::Mat timeline = cv::Mat::zeros(30, std::max(640, (int)(oscillations.size() * 1)), CV_8UC3);
 		int breaths = 0;
 		//normalizing and smoothing could be generalized to a transform lambda with mutable capture accumulating?
@@ -196,8 +204,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 				std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
 			{ return std::minmax_element(vals.begin() + std::max(0, idx - 25), vals.begin() + std::min(idx + 25, (int)vals.size())); });
 			std::vector<double> pcts;
-			std::transform(v.begin(), v.end(), std::back_inserter(pcts), [vals, minmaxes, &measurement, &kf](int idx) ->
-				double { measurement.at<float>(0) = *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); kf.correct(measurement); return kf.predict().at<float>(0); });
+			SmoothData(v, vals, minmaxes, pcts);
 			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
 			for (int i = 0; i < vals.size(); i++) {
 				double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
@@ -223,25 +230,27 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	}
 
 	if (ft.size() != 0) {
-		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(ft.begin(), ft.end());
-		double dMin = *dMinMax.first;
-		double d = *dMinMax.second;
+		std::vector<int> v(ft.size());
+		std::iota(v.begin(), v.end(), 0);
+		std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
+		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&ft](int idx) ->
+			std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
+		{ return std::minmax_element(ft.begin() + std::max(0, idx - 25), ft.begin() + std::min(idx + 25, (int)ft.size())); });
+		std::vector<double> pcts;
+		SmoothData(v, ft, minmaxes, pcts);
+		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
 		cv::Mat timeline = cv::Mat::zeros(30, ft.size() * dScale, CV_8UC3);
 		int breaths = 0;
-		if (d != 0) {
-			for (int i = 0; i < ft.size(); i++) {
-				if (ft[i] != 0) {
-					double pct = (ft[i] - dMin) / (d - dMin);
-					if (i != 0 && i != ft.size() - 1 && (ft[i] > ft[i - 1]) && (ft[i] > ft[i + 1])) {
-						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
-						breaths++;
-					} else if (i != 0 && i != ft.size() - 1 && (ft[i] < ft[i - 1]) && (ft[i] < ft[i + 1])) {
-						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
-						breaths++;
-					}
-					timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
-				}
+		for (int i = 0; i < ft.size(); i++) {
+			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
+			if (i != 0 && i != ft.size() - 1 && (pcts[i] > pcts[i - 1]) && (pcts[i] > pcts[i + 1])) {
+				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
+				breaths++;
+			} else if (i != 0 && i != ft.size() - 1 && (pcts[i] < pcts[i - 1]) && (pcts[i] < pcts[i + 1])) {
+				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
+				breaths++;
 			}
+			timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
 		}
 		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(ft.size() * dScale)), 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 480, std::min(640, (int)(ft.size() * dScale)), 30)));
@@ -259,20 +268,29 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		//in a stable case, it depends on the sharpness of features in breathing region
 		//must filter out oscillation wave based on 2 thresholds
 		cv::Mat timeline = cv::Mat::zeros(30, motionDetected.size() * dScale, CV_8UC3);
+		std::vector<int> v(motionDetected.size());
+		std::iota(v.begin(), v.end(), 0);
+		std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
+		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&motionDetected](int idx) ->
+			std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
+		{ return std::minmax_element(motionDetected.begin() + std::max(0, idx - 25), motionDetected.begin() + std::min(idx + 25, (int)motionDetected.size())); });
+		std::vector<double> pcts;
+		SmoothData(v, motionDetected, minmaxes, pcts);
+		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
+
 		int breaths = 0;
 		double lastpct = 0;
 		for (int i = 0; i < motionDetected.size(); i++) {
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin() + (i < 5 ? 0 : (i - 5)), motionDetected.begin() + i + 1);
-			double d = *dMinMax.second;
+			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
 			//log(exp(N) * Value) / N brings normalized value to logarithmic scale with correctly chosen N factor which is big enough to bring all values above 1
 			//log(1+Value) also works
-			double pct = d == 0 ? 0 : motionDetected[i] / d; //if (pct > 1.0) pct = 1.0; if (pct > .001) pct = .001; pct *= 1000;
+			//double pct = d == 0 ? 0 : motionDetected[i] / d; //if (pct > 1.0) pct = 1.0; if (pct > .001) pct = .001; pct *= 1000;
 			//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
-			pct = log(1 + pct * (exp(1) - 1));
-			if (i != 0 && (i != motionDetected.size() - 1) && motionDetected[i] > motionDetected[i - 1] && motionDetected[i] > motionDetected[i + 1]) {
+			//pct = log(1 + pct * (exp(1) - 1));
+			if (i != 0 && (i != motionDetected.size() - 1) && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
 				breaths++;
-			} else if (i != 0 && (i != motionDetected.size() - 1) && motionDetected[i] < motionDetected[i - 1] && motionDetected[i] < motionDetected[i + 1]) {
+			} else if (i != 0 && (i != motionDetected.size() - 1) && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
 				breaths++;
 			}
