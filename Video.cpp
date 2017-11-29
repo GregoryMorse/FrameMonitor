@@ -134,7 +134,7 @@ void SmoothData(std::vector<int> & v, std::vector<double> & vals,
 	std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> & minmaxes,
 	std::vector<double> & pcts)
 {
-	cv::KalmanFilter kf(2, 1, 0);
+	/*cv::KalmanFilter kf(2, 1, 0);
 	cv::Mat state(2, 1, CV_32F);
 	cv::Mat processNoise(2, 1, CV_32F);
 	cv::Mat measurement = cv::Mat::zeros(1, 1, CV_32F);
@@ -144,7 +144,15 @@ void SmoothData(std::vector<int> & v, std::vector<double> & vals,
 	cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
 	cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
 	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [vals, minmaxes, &measurement, &kf](int idx) ->
-		double { measurement.at<float>(0) = *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); kf.correct(measurement); return kf.predict().at<float>(0); });
+		double { measurement.at<float>(0) = *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); kf.correct(measurement); return kf.predict().at<float>(0); });*/
+
+	std::vector<double> normpcts;
+	std::transform(v.begin(), v.end(), std::back_inserter(normpcts), [vals, minmaxes](int idx) ->
+		double { return *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); });
+	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [normpcts](int idx) ->
+		double { return ((idx >= 2 ? normpcts[idx - 2] : 0) + (idx >= 1 ? normpcts[idx - 1] : 0) + normpcts[idx] +
+				(idx + 2 <= normpcts.size() ? normpcts[idx + 1] : 0) + (idx + 3 <= normpcts.size() ? normpcts[idx + 2] : 0)) /
+			((idx >= 2 ? 1 : 0) + (idx >= 1 ? 1 : 0) + 1 + (idx + 2 <= normpcts.size() ? 1 : 0) + (idx + 3 <= normpcts.size() ? 1 : 0)); });
 }
 
 cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> & motionDetected, std::vector<double> & oscillations, std::vector<double> & oscCount, double dMaxContourSize,
