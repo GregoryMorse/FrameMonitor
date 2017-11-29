@@ -156,7 +156,7 @@ void SmoothData(std::vector<int> & v, std::vector<double> & vals,
 }
 
 cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> & motionDetected, std::vector<double> & oscillations, std::vector<double> & oscCount, double dMaxContourSize,
-	int frameNum, int framesPerSecond, time_t startTime, std::vector<double> & ft, double dScale)
+	int frameNum, int iBaseFrame, int framesPerSecond, time_t startTime, std::vector<double> & ft, double dScale)
 {
 	cv::Mat canvas = cv::Mat3b(570, 640, cv::Vec3b(0, 0, 0));
 	//480x420, 480x60, 160x210, 160x210
@@ -177,7 +177,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	sprintf(buf, "Time: %lu", frameNum / framesPerSecond);
 	s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 	cv::putText(canvas, cv::String(buf), cv::Point(480 + (160 - s.width) / 2, 210 + 10 + 15), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
-	sprintf(buf, "Processing FPS: %lu", now == startTime ? 0 : frameNum / (int)(now - startTime));
+	sprintf(buf, "Processing FPS: %lu", now == startTime ? 0 : (frameNum - iBaseFrame) / (int)(now - startTime));
 	s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 	cv::putText(canvas, cv::String(buf), cv::Point(480 + (160 - s.width) / 2, 210 + 10 + 30), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
 
@@ -216,10 +216,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
 			for (int i = 0; i < vals.size(); i++) {
 				double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
-				if (i != 0 && lastpct < 0.5 && pct > 0.5) {
+				if (i > 1 && i < vals.size() - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
 					cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
 					breaths++;
-				} else if (i != 0 && lastpct > 0.5 && pct < 0.5) {
+				} else if (i > 1 && i < vals.size() - 2 && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
 					cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
 					breaths++;
 				}
@@ -231,7 +231,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		timeline.copyTo(canvas(cv::Rect(0, 450, 640, 30)));
 
 		char buf[256];
-		sprintf(buf, "Breaths: %lu", breaths / 2);
+		sprintf(buf, "Breaths: %lu (feature points)", breaths / 2);
 		int baseLine = 0;
 		cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 		cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 450 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
@@ -251,10 +251,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		int breaths = 0;
 		for (int i = 0; i < ft.size(); i++) {
 			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
-			if (i != 0 && i != ft.size() - 1 && (pcts[i] > pcts[i - 1]) && (pcts[i] > pcts[i + 1])) {
+			if (i > 1 && i < ft.size() - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
 				breaths++;
-			} else if (i != 0 && i != ft.size() - 1 && (pcts[i] < pcts[i - 1]) && (pcts[i] < pcts[i + 1])) {
+			} else if (i > 1 && i < ft.size() - 2 && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
 				breaths++;
 			}
@@ -264,7 +264,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		timeline.copyTo(canvas(cv::Rect(0, 480, std::min(640, (int)(ft.size() * dScale)), 30)));
 
 		char buf[256];
-		sprintf(buf, "Breaths: %lu", breaths / 2);
+		sprintf(buf, "Breaths: %lu (light intensity)", breaths / 2);
 		int baseLine = 0;
 		cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 		cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 480 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
@@ -295,10 +295,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			//double pct = d == 0 ? 0 : motionDetected[i] / d; //if (pct > 1.0) pct = 1.0; if (pct > .001) pct = .001; pct *= 1000;
 			//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
 			//pct = log(1 + pct * (exp(1) - 1));
-			if (i != 0 && (i != motionDetected.size() - 1) && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1]) {
+			if (i > 1 && i < motionDetected.size() - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
 				breaths++;
-			} else if (i != 0 && (i != motionDetected.size() - 1) && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1]) {
+			} else if (i > 1 && i < motionDetected.size() - 2 && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
 				breaths++;
 			}
@@ -309,7 +309,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		timeline.copyTo(canvas(cv::Rect(0, 510, std::min(640, (int)(motionDetected.size() * dScale)), 30)));
 
 		char buf[256];
-		sprintf(buf, "Breaths: %lu", breaths / 2);
+		sprintf(buf, "Breaths: %lu (motion area)", breaths / 2);
 		int baseLine = 0;
 		cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 		cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 510 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
@@ -388,6 +388,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	cv::Mat ellipse, refellipse, nextellipse, distellipse, tellipse, calcdistellipse, checkellipse, nextcheckellipse;
 
 	time_t start = time(NULL);
+	int iBaseFrame = 0;
 	//cv::BFMatcher::create();
 	matcher = cv::FlannBasedMatcher::create();
 	//matcher = cv::FlannBasedMatcher::FlannBasedMatcher();
@@ -400,6 +401,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 		}
 		int iJump;
 		if ((iJump = *iJumpFrame) != -1) {
+			iBaseFrame = iJump;
 			*iJumpFrame = -1;
 			pvc.set(CV_CAP_PROP_POS_FRAMES, pp.noProcessing ? iJump : ((iJump > frameHistory) ? iJump - frameHistory : 0)); //CV_CAP_PROP_POS_MSEC
 			bg = pp.bMOG ? (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorMOG2(frameHistory, pp.threshold, pp.bShadowDetection) : (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorKNN(frameHistory, pp.threshold, pp.bShadowDetection);
@@ -519,7 +521,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 					cv::bitwise_and(frame, mask, ellipse);
 					if (ft.size() % frameHistory == 0) nextellipse = ellipse.clone();
 					else cv::bitwise_and(lastframe, mask, nextellipse);
-					bg.get()->getBackgroundImage(bkgnd);
+					if (ft.size() % (frameHistory / 2) == 0) bg.get()->getBackgroundImage(bkgnd);
 					cv::bitwise_and(bkgnd, mask, refellipse);
 
 					double totaldist, totalneg;
@@ -665,8 +667,9 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 					if (pf != NULL)
 					{
-						bg.get()->getBackgroundImage(bkgnd);
-						cv::cvtColor(bkgnd, bkgnd, pp.bGrayScale ? CV_GRAY2RGB : CV_BGR2RGB);
+						//bg.get()->getBackgroundImage(bkgnd);
+						cv::Mat bkg;
+						cv::cvtColor(bkgnd, bkg, pp.bGrayScale ? CV_GRAY2RGB : CV_BGR2RGB);
 
 						//fgnd = fgimg.clone();
 						cv::cvtColor(fgimg, fgnd, CV_GRAY2RGB);
@@ -710,7 +713,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 						//cvtColor(detFrame, detFrame, CV_BGR2RGB);
 
-						pf(DrawUI(detFrame, bkgnd, fgnd, motionDetected, oscillations, oscCount, dMaxContourSize, FrameCount, vi.dFPS, start, ft, vi.dFPS / pp.dDesiredFPS), FrameCount);
+						pf(DrawUI(detFrame, bkg, fgnd, motionDetected, oscillations, oscCount, dMaxContourSize, FrameCount, iBaseFrame, vi.dFPS, start, ft, vi.dFPS / pp.dDesiredFPS), FrameCount);
 					}
 				}
 			}
@@ -738,6 +741,7 @@ struct StartParams
 	mutable std::mutex m;
 	int iCurPos;
 	int iJumpFrame = -1;
+	int iBaseFrame = 0;
 	bool bPause;
 	double playbackRate;
 	std::chrono::time_point<std::chrono::high_resolution_clock> start;
@@ -763,6 +767,7 @@ void VideoProcessor(StartParams& p)
 void ChangeVideoPos(int Pos, void* p)
 {
 	if (((StartParams*)p)->iCurPos != Pos) {
+		((StartParams*)p)->iBaseFrame = Pos;
 		((StartParams*)p)->iJumpFrame = Pos;
 		if (((StartParams*)p)->pp.noProcessing) {
 			std::vector<int> fixBreath;
@@ -866,18 +871,19 @@ int main(int argc, char** argv)
 			char buf[256];
 			if (params.breathPos.size() != 0) {
 				double dScale = 1;// params.pp.dDesiredFPS / params.vi.dFPS;
-				cv::Mat timeline = cv::Mat::zeros(1, 1 + idx * dScale, CV_8UC3);
-				int i;
+				cv::Mat timeline = cv::Mat::zeros(1, 1 + (idx - params.iBaseFrame) * dScale, CV_8UC3);
+				int i, iBase = -1;
 				for (i = 0; i < params.breathPos.size(); i++) {
-					if (params.breathPos[i] <= idx)
-						timeline.at<cv::Vec3b>(cv::Point(params.breathPos[i] * dScale, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
-					else break;
+					if (params.breathPos[i] >= params.iBaseFrame && params.breathPos[i] <= idx) {
+						if (iBase == -1) iBase = i;
+						timeline.at<cv::Vec3b>(cv::Point((params.breathPos[i] - params.iBaseFrame) * dScale, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
+					} else if (params.breathPos[i] > idx) break;
 				}
-				cv::resize(timeline, timeline, cv::Size(std::min(640, (1 + (int)(idx * dScale))), 30), cv::INTER_MAX);
+				cv::resize(timeline, timeline, cv::Size(std::min(640, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30), cv::INTER_MAX);
 
-				timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, (1 + (int)(idx * dScale))), 30)));
+				timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30)));
 
-				sprintf(buf, "Breaths: %lu", i / 2);
+				sprintf(buf, "Breaths: %lu", iBase == -1 ? 0 : (i - iBase) / 2);
 				int baseLine = 0;
 				cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 				cv::putText(mat, cv::String(buf), cv::Point((640 - s.width) / 2, (params.pp.noProcessing ? 480 : 540) + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
