@@ -149,10 +149,57 @@ void SmoothData(std::vector<int> & v, std::vector<double> & vals,
 	std::vector<double> normpcts;
 	std::transform(v.begin(), v.end(), std::back_inserter(normpcts), [vals, minmaxes](int idx) ->
 		double { return *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); });
+	//window size should be configurable...
 	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [normpcts](int idx) ->
-		double { return ((idx >= 2 ? normpcts[idx - 2] : 0) + (idx >= 1 ? normpcts[idx - 1] : 0) + normpcts[idx] +
-				(idx + 2 <= normpcts.size() ? normpcts[idx + 1] : 0) + (idx + 3 <= normpcts.size() ? normpcts[idx + 2] : 0)) /
-			((idx >= 2 ? 1 : 0) + (idx >= 1 ? 1 : 0) + 1 + (idx + 2 <= normpcts.size() ? 1 : 0) + (idx + 3 <= normpcts.size() ? 1 : 0)); });
+		double { return ((idx >= 3 ? normpcts[idx - 3] : 0) + (idx >= 2 ? normpcts[idx - 2] : 0) + (idx >= 1 ? normpcts[idx - 1] : 0) + normpcts[idx] +
+				(idx + 2 <= normpcts.size() ? normpcts[idx + 1] : 0) + (idx + 3 <= normpcts.size() ? normpcts[idx + 2] : 0) + (idx + 4 <= normpcts.size() ? normpcts[idx + 3] : 0)) /
+			((idx >= 3 ? 1 : 0) + (idx >= 2 ? 1 : 0) + (idx >= 1 ? 1 : 0) + 1 + (idx + 2 <= normpcts.size() ? 1 : 0) + (idx + 3 <= normpcts.size() ? 1 : 0) + (idx + 4 <= normpcts.size() ? 1 : 0)); });
+}
+
+void findFrequencyMinMax(int freq, std::vector<double> pcts, std::set<int> & maxindexes, std::set<int> & minindexes)
+{
+	std::vector<int> peaks, troughs;
+	for (int i = 0; i < pcts.size(); i++) {
+		//if (i > 1 && i < pcts.size() - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
+		if (i > 0 && i < pcts.size() - 1 && pcts[i] > pcts[i - 1] && pcts[i] == pcts[i + 1]) {
+			int n = 2;
+			while (i < pcts.size() - n && pcts[i] == pcts[i + n]) n++;
+			if (i < pcts.size() - n && pcts[i] > pcts[i + n]) peaks.push_back(i);
+		} else if (i > 0 && i < pcts.size() - 1 && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1]) {
+			peaks.push_back(i);
+		//} else if (i > 1 && i < pcts.size() - 2 && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
+		} else if (i > 0 && i < pcts.size() - 1 && pcts[i] < pcts[i - 1] && pcts[i] == pcts[i + 1]) {
+			int n = 2;
+			while (i < pcts.size() - n && pcts[i] == pcts[i + n]) n++;
+			if (i < pcts.size() - n && pcts[i] < pcts[i + n]) {
+				troughs.push_back(i);
+				//if (peaks.size() != 0 && troughs.size() != 0 && peaks.back() == i - 1 && troughs.back() == i - 2) peaks.pop_back();
+			}
+		} else if (i > 0 && i < pcts.size() - 1 && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1]) {
+			//if (peaks.size() != 0 && troughs.size() != 0 && peaks.back() == i - 1 && troughs.back() == i - 2) peaks.pop_back();
+			troughs.push_back(i);
+		}
+	}
+	int lasti = 0, maxlasti = 0;
+	int lastmin = 0;
+	if (peaks.size() == 0) return;
+	for (int i = 0; i <= peaks.size(); i++) {
+		if (peaks[maxlasti] > peaks[lasti] + freq) {
+			while (maxlasti + 1 < peaks.size() && peaks[maxlasti] <= peaks[lasti] + freq * 3 / 2 && pcts[peaks[maxlasti + 1]] > pcts[peaks[maxlasti]]) maxlasti++;
+			maxindexes.insert(peaks[maxlasti]);
+			if (lastmin < troughs.size() && troughs[lastmin] < peaks[maxlasti]) {
+				int min;
+				for (min = lastmin; min < troughs.size() && peaks[maxlasti] > troughs[min]; min++) {}
+				minindexes.insert(*std::min_element(troughs.begin() + lastmin, troughs.begin() + min, [pcts](int& i1, int& i2) { return pcts[i1] < pcts[i2]; }));
+				lastmin = min;
+			}
+			lasti = maxlasti; maxlasti = i;
+		}
+		if (i == peaks.size()) break;
+		if (peaks[maxlasti] <= peaks[lasti] + freq || pcts[peaks[i]] > pcts[peaks[maxlasti]]) {
+			maxlasti = i;
+		}
+	}
 }
 
 cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> & motionDetected, std::vector<double> & oscillations, std::vector<double> & oscCount, double dMaxContourSize,
@@ -214,12 +261,14 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			std::vector<double> pcts;
 			SmoothData(v, vals, minmaxes, pcts);
 			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
+			std::set<int> maxindexes, minindexes;
+			findFrequencyMinMax(25, pcts, maxindexes, minindexes);
 			for (int i = 0; i < vals.size(); i++) {
 				double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
-				if (i > 1 && i < vals.size() - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
+				if (maxindexes.find(i) != maxindexes.end()) {
 					cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
 					breaths++;
-				} else if (i > 1 && i < vals.size() - 2 && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
+				} else if (minindexes.find(i) != minindexes.end()) {
 					cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
 					breaths++;
 				}
@@ -247,14 +296,16 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		std::vector<double> pcts;
 		SmoothData(v, ft, minmaxes, pcts);
 		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
+		std::set<int> maxindexes, minindexes;
+		findFrequencyMinMax(25, pcts, maxindexes, minindexes);
 		cv::Mat timeline = cv::Mat::zeros(30, ft.size() * dScale, CV_8UC3);
 		int breaths = 0;
 		for (int i = 0; i < ft.size(); i++) {
 			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
-			if (i > 1 && i < ft.size() - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
+			if (maxindexes.find(i) != maxindexes.end()) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
 				breaths++;
-			} else if (i > 1 && i < ft.size() - 2 && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
+			} else if (minindexes.find(i) != minindexes.end()) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
 				breaths++;
 			}
@@ -285,7 +336,8 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		std::vector<double> pcts;
 		SmoothData(v, motionDetected, minmaxes, pcts);
 		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
-
+		std::set<int> maxindexes, minindexes;
+		findFrequencyMinMax(25, pcts, maxindexes, minindexes);
 		int breaths = 0;
 		double lastpct = 0;
 		for (int i = 0; i < motionDetected.size(); i++) {
@@ -295,10 +347,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 			//double pct = d == 0 ? 0 : motionDetected[i] / d; //if (pct > 1.0) pct = 1.0; if (pct > .001) pct = .001; pct *= 1000;
 			//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
 			//pct = log(1 + pct * (exp(1) - 1));
-			if (i > 1 && i < motionDetected.size() - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
+			if (maxindexes.find(i) != maxindexes.end()) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
 				breaths++;
-			} else if (i > 1 && i < motionDetected.size() - 2 && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
+			} else if (minindexes.find(i) != minindexes.end()) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
 				breaths++;
 			}
