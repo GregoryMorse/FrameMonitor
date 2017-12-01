@@ -587,10 +587,12 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 					cv::threshold(cumulativeMask, mask, 0, 255, cv::THRESH_BINARY);
 					cv::bitwise_and(frame, mask, ellipse);
-					if (ft.size() % frameHistory == 0) nextellipse = ellipse.clone();
+					if (ft.size() == 0) nextellipse = ellipse.clone();
 					else cv::bitwise_and(lastframe, mask, nextellipse);
-					if (ft.size() % (frameHistory / 2) == 0) bg.get()->getBackgroundImage(bkgnd);
-					cv::bitwise_and(bkgnd, mask, refellipse);
+					if (ft.size() == 0) {
+						bkgnd = nextellipse;
+						cv::bitwise_and(bkgnd, mask, refellipse);
+					}
 
 					double totaldist, totalneg;
 					cv::absdiff(ellipse, nextellipse, distellipse);
@@ -609,6 +611,14 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 					ft.push_back(totaldist - totalneg);
 					lastframe = frame.clone();
 
+					std::vector<int> v(std::min((int)ft.size(), frameHistory));
+					std::iota(v.begin(), v.end(), 0);
+					int minidx = *std::min_element(v.begin(), v.end(), [ft](int idx1, int idx2) ->
+						bool { return ft[idx1] < ft[idx2]; });
+					if (minidx == v.back()) {
+						bkgnd = nextellipse;
+						cv::bitwise_and(bkgnd, mask, refellipse);
+					}
 					mask = fgimg.clone();
 					//cv::calcOpticalFlowSF() //contrib optflow module
 					//could make a convex hull to get a more inclusive shape around the contours...
