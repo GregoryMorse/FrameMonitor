@@ -502,7 +502,8 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				if (pp.iMinHeight != 0 || pp.iMinWidth != 0) cv::resize(frame, frame, cv::Size(pp.iMinWidth, pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
 				if (pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
 
-				if (oscillations.size() % frameHistory == 0) {
+				//reference frame is the lowest in callibration window
+				if (oscillations.size() == 0) {
 					cv::goodFeaturesToTrack(frame, lastpts, 100, 0.3, 7);
 					cv::cornerSubPix(frame, lastpts, cv::Size(10, 10), cv::Size(-1, -1), termcrit);
 					cv::buildOpticalFlowPyramid(frame, pyramid, cv::Size(21, 21), 3);
@@ -510,7 +511,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				cv::buildOpticalFlowPyramid(frame, nextpyr, cv::Size(21, 21), 3);
 				//best features are the ones closest to the motion window
 				cv::calcOpticalFlowPyrLK(pyramid, nextpyr, lastpts, pts, status, err);
-				if (oscillations.size() % frameHistory == 0) { nextstatus = status; nextpts = pts; }
+				if (oscillations.size() == 0) { nextstatus = status; nextpts = pts; }
 				//cv::calcOpticalFlowFarneback(bkgnd, frame, pyramid, 0.5, 3, 15, 3, 5, 1.2, 0);
 				double totaldist = 0, totalneg = 0;
 				int totalosc = 0, totalnegosc = 0;
@@ -520,6 +521,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 					double dist = cv::norm(pts[i] - nextpts[i]);
 					//based on reference point - either fixed in image preferably by gravity vector but hard to determine
 					//or based on point in background image, must determine which are positive and negative distance contributors
+					//choose most negative point in calibration window
 					if (cv::norm(pts[i] - lastpts[i]) > cv::norm(nextpts[i] - lastpts[i])) {
 						totaldist += dist; totalosc++;
 					}
@@ -532,6 +534,20 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				//pyramid = nextpyr;
 				oscillations.push_back((totaldist - totalneg));
 				oscCount.push_back(std::max(totalosc, totalnegosc));
+				std::vector<int> v(std::min((int)oscillations.size(), frameHistory));
+				std::iota(v.begin(), v.end(), 0);
+				int minidx = *std::min_element(v.begin(), v.end(), [oscillations, oscCount](int idx1, int idx2) ->
+					bool { return oscillations[idx1] / oscCount[idx1] < oscillations[idx2] / oscCount[idx2]; });
+				if (minidx == v.back()) {
+					cv::goodFeaturesToTrack(frame, lastpts, 100, 0.3, 7);
+					cv::cornerSubPix(frame, lastpts, cv::Size(10, 10), cv::Size(-1, -1), termcrit);
+					cv::buildOpticalFlowPyramid(frame, pyramid, cv::Size(21, 21), 3);
+					cv::buildOpticalFlowPyramid(frame, nextpyr, cv::Size(21, 21), 3);
+					//best features are the ones closest to the motion window
+					cv::calcOpticalFlowPyrLK(pyramid, nextpyr, lastpts, pts, status, err);
+					nextstatus = status; nextpts = pts;
+				}
+
 				if (FrameCount % UseEvery == 0) {
 
 					//motion detection
