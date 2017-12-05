@@ -205,6 +205,60 @@ void findFrequencyMinMax(int freq, std::vector<double> & pcts, std::set<int> & m
 	}
 }
 
+void calcResults(std::vector<double> & motionDetected, std::vector<double> & oscillations, std::vector<double> & oscCount, std::vector<double> & ft,
+	std::vector<double> & finalpcts, std::set<int> & maxindexes, std::set<int> & minindexes, int windowSize)
+{
+	int ms = motionDetected.size();
+
+	std::vector<double> vals;
+	std::vector<int> v(ms);
+	std::iota(v.begin(), v.end(), 0);
+	std::transform(v.begin(), v.end(), std::back_inserter(vals),
+		[oscillations, oscCount](int idx) ->
+		double { return oscCount[idx] == 0 ? 0 : oscillations[idx] / oscCount[idx]; });
+	std::vector<std::pair<double, double>> minmaxes;
+	int vs = vals.size();
+	std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals, vs](int idx) ->
+		std::pair<double, double>
+	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
+		std::minmax_element(vals.begin() + std::max(0, idx - 25), vals.begin() + std::min(idx + 25, (int)vs));
+	return std::pair<double, double>(*minmax.first, *minmax.second); });
+	std::vector<double> pcts1;
+	SmoothData(v, vals, minmaxes, pcts1);
+
+	//std::vector<int> v(ft.size());
+	//std::iota(v.begin(), v.end(), 0);
+	//std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
+	minmaxes.clear();
+	vs = ft.size();
+	std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&ft, vs](int idx) ->
+		std::pair<double, double>
+	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
+		std::minmax_element(ft.begin() + std::max(0, idx - 25), ft.begin() + std::min(idx + 25, (int)vs));
+	return std::pair<double, double>(*minmax.first, *minmax.second); });
+	std::vector<double> pcts2;
+	SmoothData(v, ft, minmaxes, pcts2);
+
+	//std::vector<int> v(ms);
+	//std::iota(v.begin(), v.end(), 0);
+	//std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
+	minmaxes.clear();
+	std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&motionDetected, ms](int idx) ->
+		std::pair<double, double>
+	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
+		std::minmax_element(motionDetected.begin() + std::max(0, idx - 25), motionDetected.begin() + std::min(idx + 25, (int)ms));
+	return std::pair<double, double>(*minmax.first, *minmax.second); });
+	std::vector<double> pcts3;
+	SmoothData(v, motionDetected, minmaxes, pcts3);
+
+	std::vector<double> pcts;
+	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [pcts1, pcts2, pcts3](int idx) -> double { return pcts1[idx] + pcts2[idx] + pcts3[idx]; });
+
+	std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
+	findFrequencyMinMax(25, pcts, maxindexes, minindexes);
+	std::transform(v.begin(), v.end(), std::back_inserter(finalpcts), [pcts, &dMinMax](int idx) -> double { return *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[idx] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first); });
+}
+
 cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> & motionDetected, std::vector<double> & oscillations, std::vector<double> & oscCount, double dMaxContourSize,
 	int frameNum, int iBaseFrame, int framesPerSecond, time_t startTime, std::vector<double> & ft, double dScale)
 {
@@ -235,12 +289,13 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	if (ms != 0) {
 		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin(), motionDetected.end());
 		double d = *dMinMax.second;
-		cv::Mat timeline = cv::Mat(1, ms, CV_8UC3);
-		for (int i = 0; i < ms; i++) {
+		cv::Mat timeline = cv::Mat(1, std::min(640, (int)ms), CV_8UC3);
+		int base = std::max(0, ms - 640);
+		for (int i = base; i < ms; i++) {
 			double pct = motionDetected[i] / dMaxContourSize;
-			timeline.at<cv::Vec3b>(cv::Point(i, 0)) = cv::Vec3b(pct > 0.5 ? 0 : 255 * (1 - pct * 2), 255 * (pct > 0.5 ? (pct * 2 - 1) : 1), 255);
+			timeline.at<cv::Vec3b>(cv::Point(i - base, 0)) = cv::Vec3b(pct > 0.5 ? 0 : 255 * (1 - pct * 2), 255 * (pct > 0.5 ? (pct * 2 - 1) : 1), 255);
 		}
-		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)ms), 30), cv::INTER_MAX);
+		//cv::resize(timeline, timeline, cv::Size(std::min(640, (int)ms), 30), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 420, std::min(640, (int)ms), 30)));
 	}
 
@@ -371,59 +426,13 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	}*/
 
 	if (ms != 0) {
-		cv::Mat timeline = cv::Mat::zeros(90, ms * dScale, CV_8UC3);
-
-		std::vector<double> vals;
-		std::vector<int> v(oscillations.size());
-		std::iota(v.begin(), v.end(), 0);
-		std::transform(v.begin(), v.end(), std::back_inserter(vals),
-			[oscillations, oscCount](int idx) ->
-			double { return oscCount[idx] == 0 ? 0 : oscillations[idx] / oscCount[idx]; });
-		std::vector<std::pair<double, double>> minmaxes;
-		int vs = vals.size();
-		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals, vs](int idx) ->
-			std::pair<double, double>
-		{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax = 
-			std::minmax_element(vals.begin() + std::max(0, idx - 25), vals.begin() + std::min(idx + 25, (int)vs));
-		return std::pair<double, double>(*minmax.first, *minmax.second); });
-		std::vector<double> pcts1;
-		SmoothData(v, vals, minmaxes, pcts1);
-
-		//std::vector<int> v(ft.size());
-		//std::iota(v.begin(), v.end(), 0);
-		//std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
-		minmaxes.clear();
-		vs = ft.size();
-		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&ft, vs](int idx) ->
-			std::pair<double, double>
-		{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
-			std::minmax_element(ft.begin() + std::max(0, idx - 25), ft.begin() + std::min(idx + 25, (int)vs));
-		return std::pair<double, double>(*minmax.first, *minmax.second); });
-		std::vector<double> pcts2;
-		SmoothData(v, ft, minmaxes, pcts2);
-
-		//std::vector<int> v(ms);
-		//std::iota(v.begin(), v.end(), 0);
-		//std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
-		minmaxes.clear();
-		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&motionDetected, ms](int idx) ->
-			std::pair<double, double>
-		{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
-			std::minmax_element(motionDetected.begin() + std::max(0, idx - 25), motionDetected.begin() + std::min(idx + 25, (int)ms));
-		return std::pair<double, double>(*minmax.first, *minmax.second); });
-		std::vector<double> pcts3;
-		SmoothData(v, motionDetected, minmaxes, pcts3);
+		cv::Mat timeline = cv::Mat::zeros(90, std::min(640, (int)(ms * dScale)), CV_8UC3);
 
 		std::vector<double> pcts;
-		std::transform(v.begin(), v.end(), std::back_inserter(pcts), [pcts1, pcts2, pcts3](int idx) -> double { return pcts1[idx] + pcts2[idx] + pcts3[idx]; });
-
-		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
 		std::set<int> maxindexes, minindexes;
-		findFrequencyMinMax(25, pcts, maxindexes, minindexes);
+		calcResults(motionDetected, oscillations, oscCount, ft, pcts, maxindexes, minindexes, std::min(640, (int)(ms * dScale)));
 		int breaths = 0;
-		double lastpct = 0;
-		for (int i = 0; i < ms; i++) {
-			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
+		for (int i = 0; i < std::min(640, (int)(ms * dScale)); i++) {
 			if (maxindexes.find(i) != maxindexes.end()) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 90), cv::Vec3b(0, 0, 255));
 				breaths++;
@@ -432,11 +441,10 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 90), cv::Vec3b(0, 255, 0));
 				breaths++;
 			}
-			if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 89 * lastpct), cv::Point(i * dScale, 89 * pct), cv::Vec3b(255, 255, 255));
+			if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 89 * pcts[i - 1]), cv::Point(i * dScale, 89 * pcts[i]), cv::Vec3b(255, 255, 255));
 			//timeline.at<cv::Vec3b>(cv::Point(i * dScale, 89 * pct)) = cv::Vec3b(255, 255, 255);
-			lastpct = pct;
 		}
-		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(ms * dScale)), 90), cv::INTER_MAX);
+		//cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(ms * dScale)), 90), cv::INTER_MAX);
 		timeline.copyTo(canvas(cv::Rect(0, 450, std::min(640, (int)(ms * dScale)), 90)));
 
 		char buf[256];
@@ -447,6 +455,48 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	}
 
 	return canvas;
+}
+
+struct DrawItem
+{
+	cv::Mat detFrame;
+	cv::Mat bkg;
+	cv::Mat fgnd;
+	std::vector<double> motionDetected;
+	std::vector<double> oscillations;
+	std::vector<double> oscCount;
+	double dMaxContourSize;
+	int FrameCount;
+	int iBaseFrame;
+	time_t start;
+	std::vector<double> ft;
+};
+
+struct DrawStartParams
+{
+	std::function<ProgressFunc> pf;
+	int* pCancel;
+	std::queue<DrawItem> drawQueue;
+	mutable std::mutex m;
+	ProcessParams pp;
+	VidInfo vi;
+};
+
+void DrawProcessor(DrawStartParams& p)
+{
+	DrawItem di;
+	while (!*p.pCancel) {
+		while (p.drawQueue.size() == 0 && !*p.pCancel) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+		if (*p.pCancel) break;
+		{
+			std::lock_guard<std::mutex> lock(p.m);
+			di = p.drawQueue.front();
+			p.drawQueue.pop();
+			p.pf(DrawUI(di.detFrame, di.bkg, di.fgnd, di.motionDetected, di.oscillations, di.oscCount, di.dMaxContourSize, di.FrameCount, di.iBaseFrame, p.vi.dFPS, di.start, di.ft, p.vi.dFPS / p.pp.dDesiredFPS), di.FrameCount);
+		}
+	}
 }
 
 struct ResizeStartParams
@@ -465,6 +515,7 @@ struct ResizeStartParams
 
 void ResizeProcessor(ResizeStartParams& p)
 {
+	cv::Mat frame;
 	while (p.pvc->isOpened() && !*p.pCancel) {
 		while (p.imgQueue.size() > 10 && !*p.pCancel && *p.iJumpFrame == -1) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -475,7 +526,7 @@ void ResizeProcessor(ResizeStartParams& p)
 				continue;
 			}
 		}
-		cv::Mat frame;
+		if (*p.pCancel) break;
 		*p.pvc >> frame; //calls read which is the same as grab/retrieve combined
 		if (!*p.pCancel && frame.dims != 0 && p.FrameCount != p.pp.iMaxFrames) {
 			if (!p.pp.noProcessing) {
@@ -495,15 +546,13 @@ void ResizeProcessor(ResizeStartParams& p)
 	}
 }
 
-void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vector<double> & motionDetected, std::vector<double> & oscillations, double & dMaxContourSize, double & dMaxOscillation, std::function<ProgressFunc> pf, int* pCancel, int* iJumpFrame, bool* bPaused)
+void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vector<double> & motionDetected, std::vector<double> & oscillations, std::vector<double> & oscCount, std::vector<double> & ft, double & dMaxContourSize, double & dMaxOscillation, std::function<ProgressFunc> pf, int* pCancel, int* iJumpFrame, bool* bPaused)
 {
 	cv::Mat frame, fgimg;
 	double dSumContourSize;
 	cv::Ptr<cv::BackgroundSubtractor> bg;
 	std::vector<std::vector<cv::Point>> contours;
 	std::vector<double> areas;
-	std::vector<double> oscCount;
-	std::vector<double> ft;
 	int UseEvery, FrameCount = 0;
 	//1440x1080 vidoes or 4:3 aspect ratio, 25fps
 	int frameHistory = pp.iCalibrationTimeWindow * pp.dDesiredFPS;
@@ -577,6 +626,12 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	params.pvc = &pvc;
 	params.iJumpFrame = iJumpFrame;
 	std::thread resizeProc(&ResizeProcessor, std::ref(params));
+	DrawStartParams drawParams = {};
+	drawParams.pp = pp;
+	drawParams.pCancel = pCancel;
+	drawParams.vi = vi;
+	drawParams.pf = pf;
+	std::thread drawProc(&DrawProcessor, std::ref(drawParams));
 	while (pvc.isOpened()) {
 		if (*bPaused && !*pCancel) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -943,7 +998,12 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 						//cvtColor(detFrame, detFrame, CV_BGR2RGB);
 
-						pf(DrawUI(detFrame, bkg, fgnd, motionDetected, oscillations, oscCount, dMaxContourSize, FrameCount, iBaseFrame, vi.dFPS, start, ft, vi.dFPS / pp.dDesiredFPS), FrameCount);
+						{
+							std::lock_guard<std::mutex> lock(drawParams.m);
+							drawParams.drawQueue.push(DrawItem{detFrame.clone(), bkg.clone(), fgnd.clone(), motionDetected, oscillations, oscCount, dMaxContourSize, FrameCount, iBaseFrame, start, ft});
+						}
+
+						//pf(DrawUI(detFrame, bkg, fgnd, motionDetected, oscillations, oscCount, dMaxContourSize, FrameCount, iBaseFrame, vi.dFPS, start, ft, vi.dFPS / pp.dDesiredFPS), FrameCount);
 					}
 				}
 			}
@@ -956,6 +1016,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 		dMaxOscillation = std::max(oscillations[i], dMaxOscillation);
 	}
 	resizeProc.join();
+	drawProc.join();
 }
 
 struct StartParams
@@ -964,6 +1025,8 @@ struct StartParams
 	VidInfo vi;
 	std::vector<double> motionDetect;
 	std::vector<double> osc;
+	std::vector<double> oscCount;
+	std::vector<double> ft;
 	double dMaxContour;
 	double dMaxOsc;
 	int pc = 0;
@@ -983,7 +1046,7 @@ struct StartParams
 
 void VideoProcessor(StartParams& p)
 {
-	ProcessVideo(p.vi, p.pp, *p.pvc, p.motionDetect, p.osc, p.dMaxContour, p.dMaxOsc,
+	ProcessVideo(p.vi, p.pp, *p.pvc, p.motionDetect, p.osc, p.oscCount, p.ft, .dMaxContour, p.dMaxOsc,
 		std::move(std::function<ProgressFunc>([&p](cv::Mat mat, int Frame) -> void {
 		while (p.imgQueue.size() > 10 && !p.pc && p.iJumpFrame == -1) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -1110,7 +1173,7 @@ int main(int argc, char** argv)
 						timeline.at<cv::Vec3b>(cv::Point((params.breathPos[i] - params.iBaseFrame) * dScale, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
 					} else if (params.breathPos[i] > idx) break;
 				}
-				cv::resize(timeline, timeline, cv::Size(std::min(640, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30), cv::INTER_MAX);
+				//cv::resize(timeline, timeline, cv::Size(std::min(640, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30), cv::INTER_MAX);
 
 				timeline.copyTo(mat(cv::Rect(0, params.pp.noProcessing ? 480 : 540, std::min(640, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30)));
 
@@ -1146,6 +1209,31 @@ int main(int argc, char** argv)
 		breathfile << params.breathPos.size() << std::endl;
 		for (int i = 0; i < params.breathPos.size(); i++) {
 			breathfile << params.breathPos[i] << std::endl;
+		}
+		breathfile.close();
+	}
+	if (params.motionDetect.size() != 0) {
+		std::string metaSignalFile = (argc == FIRST_ARG) ? "cap0.sig.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".sig.md");
+		std::string metaResultFile = (argc == FIRST_ARG) ? "cap0.res.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".res.md");
+		std::vector<double> finalpcts;
+		std::set<int> maxindexes, minindexes;
+		calcResults(params.motionDetect, params.osc, params.oscCount, params.ft, finalpcts, maxindexes, minindexes, -1);
+		std::ofstream signalfile;
+		signalfile.open(metaSignalFile);
+		signalfile << finalpcts.size() << std::endl;
+		for (int i = 0; i < finalpcts.size(); i++) {
+			signalfile << finalpcts[i] << std::endl;
+		}
+		signalfile.close();
+		std::vector<int> calcBreath;
+		std::copy(maxindexes.begin(), maxindexes.end(), std::back_inserter(calcBreath));
+		std::copy(minindexes.begin(), minindexes.end(), std::back_inserter(calcBreath));
+		std::sort(calcBreath.begin(), calcBreath.end());
+		std::ofstream breathfile;
+		breathfile.open(metaResultFile);
+		breathfile << calcBreath.size() << std::endl;
+		for (int i = 0; i < calcBreath.size(); i++) {
+			breathfile << calcBreath[i] << std::endl;
 		}
 		breathfile.close();
 	}
