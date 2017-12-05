@@ -236,7 +236,7 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 	std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&ft, vs, base](int idx) ->
 		std::pair<double, double>
 	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
-		std::minmax_element(ft.begin() + std::max(0, idx - base - 25), ft.begin() + std::min(idx - base + 25, (int)vs - base));
+		std::minmax_element(ft.begin() + std::max(0, idx - 25), ft.begin() + std::min(idx + 25, (int)vs));
 	return std::pair<double, double>(*minmax.first, *minmax.second); });
 	std::vector<double> pcts2;
 	SmoothData(v, ft, minmaxes, pcts2);
@@ -248,7 +248,7 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 	std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&motionDetected, ms, base](int idx) ->
 		std::pair<double, double>
 	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
-		std::minmax_element(motionDetected.begin() + std::max(0, idx - base - 25), motionDetected.begin() + std::min(idx - base + 25, (int)ms - base));
+		std::minmax_element(motionDetected.begin() + std::max(0, idx - 25), motionDetected.begin() + std::min(idx + 25, (int)ms));
 	return std::pair<double, double>(*minmax.first, *minmax.second); });
 	std::vector<double> pcts3;
 	SmoothData(v, motionDetected, minmaxes, pcts3);
@@ -665,6 +665,18 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 			FFTWindow = cv::Mat(0, pp.iMinWidth * pp.iMinHeight, CV_8UC1);
 			FrameCount = iJump;
 			start = time(NULL);
+			{
+				std::lock_guard<std::mutex> lock(drawParams.m);
+				while (!drawParams.drawQueue.empty()) drawParams.drawQueue.pop();
+			}
+			int doCancel = 1;
+			params.pCancel = &doCancel;
+			resizeProc.join(); //to avoid race conditions and properly synchronize, restart option utilized for jump
+			params.pCancel = pCancel;
+			params.FrameCount = iJump;
+			while (!params.imgQueue.empty()) params.imgQueue.pop();
+			while (!params.procImgQueue.empty()) params.procImgQueue.pop();
+			resizeProc = std::thread(&ResizeProcessor, std::ref(params));
 		}
 
 		/*while (vc.grab()) {
