@@ -714,6 +714,9 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 						std::transform(contours.begin(), contours.end(), std::back_inserter(areas), [](std::vector<cv::Point>& v) { return cv::contourArea(v); });
 						dMaxContourSize = std::max(dMaxContourSize, *std::max_element(areas.begin(), areas.end()) / (double)(pp.iMinWidth * pp.iMinHeight) * 100.0F);
 						dSumContourSize = (cv::sum(cv::InputArray(areas))).val[0] / (double)(pp.iMinWidth * pp.iMinHeight) * 100.0F;
+
+						//std::vector<std::vector<cv::Point>> convexHulls;
+						//std::transform(contours.begin(), contours.end(), std::back_inserter(convexHulls), [](std::vector<cv::Point>& v) { std::vector<cv::Point> hull; cv::convexHull(v, hull); return hull; });
 					}
 					else {
 						dSumContourSize = 0;
