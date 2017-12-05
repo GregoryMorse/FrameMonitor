@@ -131,7 +131,7 @@ double get_oscillation(std::vector<cv::KeyPoint> kpoints, cv::Point2f ReferenceP
 }
 
 void SmoothData(std::vector<int> & v, std::vector<double> & vals,
-	std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> & minmaxes,
+	std::vector<std::pair<double, double>> & minmaxes,
 	std::vector<double> & pcts)
 {
 	/*cv::KalmanFilter kf(2, 1, 0);
@@ -148,54 +148,57 @@ void SmoothData(std::vector<int> & v, std::vector<double> & vals,
 
 	std::vector<double> normpcts;
 	std::transform(v.begin(), v.end(), std::back_inserter(normpcts), [vals, minmaxes](int idx) ->
-		double { return *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); });
+		double { return minmaxes[idx].second - minmaxes[idx].first == 0 ? 0 : (vals[idx] - minmaxes[idx].first) / (minmaxes[idx].second - minmaxes[idx].first); });
 	//window size should be configurable...
-	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [normpcts](int idx) ->
+	int sz = normpcts.size();
+	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [normpcts, sz](int idx) ->
 		double { return ((idx >= 3 ? normpcts[idx - 3] : 0) + (idx >= 2 ? normpcts[idx - 2] : 0) + (idx >= 1 ? normpcts[idx - 1] : 0) + normpcts[idx] +
-				(idx + 2 <= normpcts.size() ? normpcts[idx + 1] : 0) + (idx + 3 <= normpcts.size() ? normpcts[idx + 2] : 0) + (idx + 4 <= normpcts.size() ? normpcts[idx + 3] : 0)) /
-			((idx >= 3 ? 1 : 0) + (idx >= 2 ? 1 : 0) + (idx >= 1 ? 1 : 0) + 1 + (idx + 2 <= normpcts.size() ? 1 : 0) + (idx + 3 <= normpcts.size() ? 1 : 0) + (idx + 4 <= normpcts.size() ? 1 : 0)); });
+				(idx + 2 <= sz ? normpcts[idx + 1] : 0) + (idx + 3 <= sz ? normpcts[idx + 2] : 0) + (idx + 4 <= sz ? normpcts[idx + 3] : 0)) /
+			((idx >= 3 ? 1 : 0) + (idx >= 2 ? 1 : 0) + (idx >= 1 ? 1 : 0) + 1 + (idx + 2 <= sz ? 1 : 0) + (idx + 3 <= sz ? 1 : 0) + (idx + 4 <= sz ? 1 : 0)); });
 }
 
-void findFrequencyMinMax(int freq, std::vector<double> pcts, std::set<int> & maxindexes, std::set<int> & minindexes)
+void findFrequencyMinMax(int freq, std::vector<double> & pcts, std::set<int> & maxindexes, std::set<int> & minindexes)
 {
 	std::vector<int> peaks, troughs;
-	for (int i = 0; i < pcts.size(); i++) {
-		//if (i > 1 && i < pcts.size() - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
-		if (i > 0 && i < pcts.size() - 1 && pcts[i] > pcts[i - 1] && pcts[i] == pcts[i + 1]) {
+	int sz = pcts.size();
+	for (int i = 0; i < sz; i++) {
+		//if (i > 1 && i < sz - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
+		if (i > 0 && i < sz - 1 && pcts[i] > pcts[i - 1] && pcts[i] == pcts[i + 1]) {
 			int n = 2;
-			while (i < pcts.size() - n && pcts[i] == pcts[i + n]) n++;
-			if (i < pcts.size() - n && pcts[i] > pcts[i + n]) peaks.push_back(i);
-		} else if (i > 0 && i < pcts.size() - 1 && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1]) {
+			while (i < sz - n && pcts[i] == pcts[i + n]) n++;
+			if (i < sz - n && pcts[i] > pcts[i + n]) peaks.push_back(i);
+		} else if (i > 0 && i < sz - 1 && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1]) {
 			peaks.push_back(i);
-		//} else if (i > 1 && i < pcts.size() - 2 && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
-		} else if (i > 0 && i < pcts.size() - 1 && pcts[i] < pcts[i - 1] && pcts[i] == pcts[i + 1]) {
+		//} else if (i > 1 && i < sz - 2 && pcts[i] < pcts[i - 2] && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1] && pcts[i] < pcts[i + 2]) {
+		} else if (i > 0 && i < sz - 1 && pcts[i] < pcts[i - 1] && pcts[i] == pcts[i + 1]) {
 			int n = 2;
-			while (i < pcts.size() - n && pcts[i] == pcts[i + n]) n++;
-			if (i < pcts.size() - n && pcts[i] < pcts[i + n]) {
+			while (i < sz - n && pcts[i] == pcts[i + n]) n++;
+			if (i < sz - n && pcts[i] < pcts[i + n]) {
 				troughs.push_back(i);
 				//if (peaks.size() != 0 && troughs.size() != 0 && peaks.back() == i - 1 && troughs.back() == i - 2) peaks.pop_back();
 			}
-		} else if (i > 0 && i < pcts.size() - 1 && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1]) {
+		} else if (i > 0 && i < sz - 1 && pcts[i] < pcts[i - 1] && pcts[i] < pcts[i + 1]) {
 			//if (peaks.size() != 0 && troughs.size() != 0 && peaks.back() == i - 1 && troughs.back() == i - 2) peaks.pop_back();
 			troughs.push_back(i);
 		}
 	}
 	int lasti = 0, maxlasti = 0;
 	int lastmin = 0;
-	if (peaks.size() == 0) return;
-	for (int i = 0; i <= peaks.size(); i++) {
+	int ps = peaks.size(); int ts = troughs.size();
+	if (ps == 0) return;
+	for (int i = 0; i <= ps; i++) {
 		if (peaks[maxlasti] > peaks[lasti] + freq) {
-			while (maxlasti + 1 < peaks.size() && peaks[maxlasti] <= peaks[lasti] + freq * 3 / 2 && pcts[peaks[maxlasti + 1]] > pcts[peaks[maxlasti]]) maxlasti++;
+			while (maxlasti + 1 < ps && peaks[maxlasti] <= peaks[lasti] + freq * 3 / 2 && pcts[peaks[maxlasti + 1]] > pcts[peaks[maxlasti]]) maxlasti++;
 			maxindexes.insert(peaks[maxlasti]);
-			if (lastmin < troughs.size() && troughs[lastmin] < peaks[maxlasti]) {
+			if (lastmin < ts && troughs[lastmin] < peaks[maxlasti]) {
 				int min;
-				for (min = lastmin; min < troughs.size() && peaks[maxlasti] > troughs[min]; min++) {}
+				for (min = lastmin; min < ts && peaks[maxlasti] > troughs[min]; min++) {}
 				minindexes.insert(*std::min_element(troughs.begin() + lastmin, troughs.begin() + min, [pcts](int& i1, int& i2) { return pcts[i1] < pcts[i2]; }));
 				lastmin = min;
 			}
 			lasti = maxlasti; maxlasti = i;
 		}
-		if (i == peaks.size()) break;
+		if (i == ps) break;
 		if (peaks[maxlasti] <= peaks[lasti] + freq || pcts[peaks[i]] > pcts[peaks[maxlasti]]) {
 			maxlasti = i;
 		}
@@ -228,17 +231,17 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 	cv::putText(canvas, cv::String(buf), cv::Point(480 + (160 - s.width) / 2, 210 + 10 + 30), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
 
-
-	if (motionDetected.size() != 0) {
+	int ms = motionDetected.size();
+	if (ms != 0) {
 		std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(motionDetected.begin(), motionDetected.end());
 		double d = *dMinMax.second;
-		cv::Mat timeline = cv::Mat(1, motionDetected.size(), CV_8UC3);
-		for (int i = 0; i < motionDetected.size(); i++) {
+		cv::Mat timeline = cv::Mat(1, ms, CV_8UC3);
+		for (int i = 0; i < ms; i++) {
 			double pct = motionDetected[i] / dMaxContourSize;
 			timeline.at<cv::Vec3b>(cv::Point(i, 0)) = cv::Vec3b(pct > 0.5 ? 0 : 255 * (1 - pct * 2), 255 * (pct > 0.5 ? (pct * 2 - 1) : 1), 255);
 		}
-		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)motionDetected.size()), 30), cv::INTER_MAX);
-		timeline.copyTo(canvas(cv::Rect(0, 420, std::min(640, (int)motionDetected.size()), 30)));
+		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)ms), 30), cv::INTER_MAX);
+		timeline.copyTo(canvas(cv::Rect(0, 420, std::min(640, (int)ms), 30)));
 	}
 
 	/*if (oscillations.size() != 0) {
@@ -367,8 +370,8 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 510 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
 	}*/
 
-	if (motionDetected.size() != 0) {
-		cv::Mat timeline = cv::Mat::zeros(90, motionDetected.size() * dScale, CV_8UC3);
+	if (ms != 0) {
+		cv::Mat timeline = cv::Mat::zeros(90, ms * dScale, CV_8UC3);
 
 		std::vector<double> vals;
 		std::vector<int> v(oscillations.size());
@@ -376,10 +379,13 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		std::transform(v.begin(), v.end(), std::back_inserter(vals),
 			[oscillations, oscCount](int idx) ->
 			double { return oscCount[idx] == 0 ? 0 : oscillations[idx] / oscCount[idx]; });
-		std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
-		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals](int idx) ->
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
-		{ return std::minmax_element(vals.begin() + std::max(0, idx - 25), vals.begin() + std::min(idx + 25, (int)vals.size())); });
+		std::vector<std::pair<double, double>> minmaxes;
+		int vs = vals.size();
+		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals, vs](int idx) ->
+			std::pair<double, double>
+		{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax = 
+			std::minmax_element(vals.begin() + std::max(0, idx - 25), vals.begin() + std::min(idx + 25, (int)vs));
+		return std::pair<double, double>(*minmax.first, *minmax.second); });
 		std::vector<double> pcts1;
 		SmoothData(v, vals, minmaxes, pcts1);
 
@@ -387,19 +393,24 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		//std::iota(v.begin(), v.end(), 0);
 		//std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
 		minmaxes.clear();
-		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&ft](int idx) ->
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
-		{ return std::minmax_element(ft.begin() + std::max(0, idx - 25), ft.begin() + std::min(idx + 25, (int)ft.size())); });
+		vs = ft.size();
+		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&ft, vs](int idx) ->
+			std::pair<double, double>
+		{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
+			std::minmax_element(ft.begin() + std::max(0, idx - 25), ft.begin() + std::min(idx + 25, (int)vs));
+		return std::pair<double, double>(*minmax.first, *minmax.second); });
 		std::vector<double> pcts2;
 		SmoothData(v, ft, minmaxes, pcts2);
 
-		//std::vector<int> v(motionDetected.size());
+		//std::vector<int> v(ms);
 		//std::iota(v.begin(), v.end(), 0);
 		//std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
 		minmaxes.clear();
-		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&motionDetected](int idx) ->
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
-		{ return std::minmax_element(motionDetected.begin() + std::max(0, idx - 25), motionDetected.begin() + std::min(idx + 25, (int)motionDetected.size())); });
+		std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&motionDetected, ms](int idx) ->
+			std::pair<double, double>
+		{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
+			std::minmax_element(motionDetected.begin() + std::max(0, idx - 25), motionDetected.begin() + std::min(idx + 25, (int)ms));
+		return std::pair<double, double>(*minmax.first, *minmax.second); });
 		std::vector<double> pcts3;
 		SmoothData(v, motionDetected, minmaxes, pcts3);
 
@@ -411,7 +422,7 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 		findFrequencyMinMax(25, pcts, maxindexes, minindexes);
 		int breaths = 0;
 		double lastpct = 0;
-		for (int i = 0; i < motionDetected.size(); i++) {
+		for (int i = 0; i < ms; i++) {
 			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
 			if (maxindexes.find(i) != maxindexes.end()) {
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 90), cv::Vec3b(0, 0, 255));
@@ -421,11 +432,12 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 				cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 90), cv::Vec3b(0, 255, 0));
 				breaths++;
 			}
-			timeline.at<cv::Vec3b>(cv::Point(i * dScale, 89 * pct)) = cv::Vec3b(255, 255, 255);
+			if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 89 * lastpct), cv::Point(i * dScale, 89 * pct), cv::Vec3b(255, 255, 255));
+			//timeline.at<cv::Vec3b>(cv::Point(i * dScale, 89 * pct)) = cv::Vec3b(255, 255, 255);
 			lastpct = pct;
 		}
-		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(motionDetected.size() * dScale)), 90), cv::INTER_MAX);
-		timeline.copyTo(canvas(cv::Rect(0, 450, std::min(640, (int)(motionDetected.size() * dScale)), 90)));
+		cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(ms * dScale)), 90), cv::INTER_MAX);
+		timeline.copyTo(canvas(cv::Rect(0, 450, std::min(640, (int)(ms * dScale)), 90)));
 
 		char buf[256];
 		sprintf(buf, "Breaths: %lu", breaths / 2);
@@ -435,6 +447,52 @@ cv::Mat DrawUI(cv::Mat frame, cv::Mat bkgnd, cv::Mat fgnd, std::vector<double> &
 	}
 
 	return canvas;
+}
+
+struct ResizeStartParams
+{
+	cv::VideoCapture* pvc;
+	bool *bPaused;
+	int* pCancel;
+	int FrameCount;
+	int* iJumpFrame;
+	std::queue<cv::Mat> imgQueue;
+	std::queue<cv::Mat> procImgQueue;
+	mutable std::mutex m;
+	ProcessParams pp;
+};
+
+
+void ResizeProcessor(ResizeStartParams& p)
+{
+	while (p.pvc->isOpened() && !*p.pCancel) {
+		while (p.imgQueue.size() > 10 && !*p.pCancel && *p.iJumpFrame == -1) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+		if (*p.bPaused && !*p.pCancel) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+			if (*p.bPaused && !*p.pCancel) {
+				continue;
+			}
+		}
+		cv::Mat frame;
+		*p.pvc >> frame; //calls read which is the same as grab/retrieve combined
+		if (!*p.pCancel && frame.dims != 0 && p.FrameCount != p.pp.iMaxFrames) {
+			if (!p.pp.noProcessing) {
+				cv::Mat detFrame = frame.clone();
+				if (p.pp.iMinHeight != 0 || p.pp.iMinWidth != 0) cv::resize(frame, frame, cv::Size(p.pp.iMinWidth, p.pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
+				if (p.pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
+				{
+					std::lock_guard<std::mutex> lock(p.m);
+					p.imgQueue.push(detFrame);
+					p.procImgQueue.push(frame);
+				}
+			} else {
+				std::lock_guard<std::mutex> lock(p.m);
+				p.imgQueue.push(frame);
+			}
+		}
+	}
 }
 
 void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vector<double> & motionDetected, std::vector<double> & oscillations, double & dMaxContourSize, double & dMaxOscillation, std::function<ProgressFunc> pf, int* pCancel, int* iJumpFrame, bool* bPaused)
@@ -511,10 +569,18 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	//cv::BFMatcher::create();
 	matcher = cv::FlannBasedMatcher::create();
 	//matcher = cv::FlannBasedMatcher::FlannBasedMatcher();
+	ResizeStartParams params = {};
+	params.bPaused = bPaused;
+	params.pCancel = pCancel;
+	params.FrameCount = FrameCount;
+	params.pp = pp;
+	params.pvc = &pvc;
+	params.iJumpFrame = iJumpFrame;
+	std::thread resizeProc(&ResizeProcessor, std::ref(params));
 	while (pvc.isOpened()) {
-		if (*bPaused) {
+		if (*bPaused && !*pCancel) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
-			if (*bPaused) {
+			if (*bPaused && !*pCancel) {
 				continue;
 			}
 		}
@@ -547,7 +613,15 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 			cv::OutputArray img();
 			vc.retrieve(img);
 		}*/
-		pvc >> frame; //calls read which is the same as grab/retrieve combined
+		//pvc >> frame; //calls read which is the same as grab/retrieve combined
+		while (params.imgQueue.size() == 0) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+		{
+			std::lock_guard<std::mutex> lock(params.m);
+			frame = params.imgQueue.front();
+			params.imgQueue.pop();
+		}
 		//CV_CAP_PROP_FRAME_COUNT, CV_CAP_PROP_FORMAT, CV_CAP_PROP_POS_MSEC, CV_CAP_PROP_POS_FRAMES
 		//if (!vc.isOpened()) break;
 		if (!*pCancel && frame.dims != 0 && FrameCount != pp.iMaxFrames) {
@@ -564,11 +638,18 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				continue;
 			}
 			else {
-				cv::Mat detFrame = frame.clone();
+				cv::Mat detFrame = frame;// frame.clone();
 				//conversion for processing
-				if (pp.iMinHeight != 0 || pp.iMinWidth != 0) cv::resize(frame, frame, cv::Size(pp.iMinWidth, pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
-				if (pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
-
+				//if (pp.iMinHeight != 0 || pp.iMinWidth != 0) cv::resize(frame, frame, cv::Size(pp.iMinWidth, pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
+				//if (pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
+				while (params.procImgQueue.size() == 0) {
+					std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				}
+				{
+					std::lock_guard<std::mutex> lock(params.m);
+					frame = params.procImgQueue.front();
+					params.procImgQueue.pop();
+				}
 				//reference frame is the lowest in callibration window
 				if (oscillations.size() == 0) {
 					cv::goodFeaturesToTrack(frame, lastpts, 100, 0.3, 7);
@@ -582,7 +663,8 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				//cv::calcOpticalFlowFarneback(bkgnd, frame, pyramid, 0.5, 3, 15, 3, 5, 1.2, 0);
 				double totaldist = 0, totalneg = 0;
 				int totalosc = 0, totalnegosc = 0;
-				for (int i = 0; i < pts.size(); i++) {
+				int sz = pts.size();
+				for (int i = 0; i < sz; i++) {
 					if (!status[i] || !nextstatus[i]) continue;
 					//if (err.at<float>(cv::Point(0, i)) > 2) continue;;
 					double dist = cv::norm(pts[i] - nextpts[i]);
@@ -841,12 +923,12 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 						if (pp.iMinHeight != 0 || pp.iMinWidth != 0) {
 							std::vector<cv::KeyPoint> kpoints;
-							std::transform(lastkps.begin(), lastkps.end(), std::back_inserter(kpoints), [pp, vi](cv::KeyPoint& v) { return cv::KeyPoint(cv::Point2f(v.pt.x * vi.dwWidthInPixels / pp.iMinWidth, v.pt.y * vi.dwHeightInPixels / pp.iMinHeight), v.size * vi.dwWidthInPixels / pp.iMinWidth, v.angle, v.response, v.octave, v.class_id); });
+							std::transform(lastkps.begin(), lastkps.end(), std::back_inserter(kpoints), [&pp, &vi](cv::KeyPoint& v) { return cv::KeyPoint(cv::Point2f(v.pt.x * vi.dwWidthInPixels / pp.iMinWidth, v.pt.y * vi.dwHeightInPixels / pp.iMinHeight), v.size * vi.dwWidthInPixels / pp.iMinWidth, v.angle, v.response, v.octave, v.class_id); });
 							cv::drawKeypoints(detFrame, kpoints, detFrame);
 						}
 						else cv::drawKeypoints(detFrame, lastkps, detFrame);
-
-						for (int i = 0; i < pts.size(); i++) {
+						sz = pts.size();
+						for (int i = 0; i < sz; i++) {
 							if (!status[i]) continue;
 							if (pp.iMinHeight != 0 || pp.iMinWidth != 0) {
 								cv::circle(detFrame, cv::Point2f(pts[i].x * vi.dwWidthInPixels / pp.iMinWidth, pts[i].y * vi.dwHeightInPixels / pp.iMinHeight), 5, cv::Scalar(255, 0, 0), 2);
@@ -870,6 +952,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 		if (oscCount[i] != 0) oscillations[i] /= oscCount[i];
 		dMaxOscillation = std::max(oscillations[i], dMaxOscillation);
 	}
+	resizeProc.join();
 }
 
 struct StartParams
@@ -986,7 +1069,7 @@ int main(int argc, char** argv)
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
 	params.playbackRate = 1000;
-	params.pp = ProcessParams{ true, 400, 300, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, false };
+	params.pp = ProcessParams{ true, 200, 150, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, false };
 	if (params.pp.noProcessing) params.breathPos.clear();
 	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
@@ -1017,8 +1100,8 @@ int main(int argc, char** argv)
 			if (params.breathPos.size() != 0) {
 				double dScale = 1;// params.pp.dDesiredFPS / params.vi.dFPS;
 				cv::Mat timeline = cv::Mat::zeros(1, 1 + (idx - params.iBaseFrame) * dScale, CV_8UC3);
-				int i, iBase = -1;
-				for (i = 0; i < params.breathPos.size(); i++) {
+				int i, iBase = -1, sz = params.breathPos.size();
+				for (i = 0; i < sz; i++) {
 					if (params.breathPos[i] >= params.iBaseFrame && params.breathPos[i] <= idx) {
 						if (iBase == -1) iBase = i;
 						timeline.at<cv::Vec3b>(cv::Point((params.breathPos[i] - params.iBaseFrame) * dScale, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
