@@ -82,7 +82,7 @@ void VideoCleanup(void* p)
 
 typedef void (ProgressFunc)(cv::Mat mat, int Frame);
 
-#define DIRCHANGE_THRESHOLD 4
+/*#define DIRCHANGE_THRESHOLD 4
 
 bool check_oscillation(std::vector<cv::KeyPoint> kpoints, cv::Point2f ReferencePoint)
 {
@@ -128,7 +128,7 @@ double get_oscillation(std::vector<cv::KeyPoint> kpoints, cv::Point2f ReferenceP
 		*it = (*it - base) / max;
 	}
 	return 0;
-}
+}*/
 
 void SmoothData(std::vector<int> & v, std::vector<double> & vals,
 	std::vector<std::pair<double, double>> & minmaxes,
@@ -568,19 +568,19 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	}
 	dMaxContourSize = 0;
 	std::vector<std::vector<std::vector<cv::Point>>> contourWindow;
-	std::map<cv::Point, FeatureDataPoint> fdps;
-	cv::Ptr<cv::Feature2D> featDetector;
-	cv::Ptr<cv::DescriptorMatcher> matcher;
+	//std::map<cv::Point, FeatureDataPoint> fdps;
+	//cv::Ptr<cv::Feature2D> featDetector;
+	//cv::Ptr<cv::DescriptorMatcher> matcher;
 	std::vector<cv::KeyPoint> lastkps;
-	cv::Mat lastdescs;
+	//cv::Mat lastdescs;
 	cv::Mat bkgnd, fgnd, mask, cumulativeMask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
-	std::vector<cv::KeyPoint> kps;
-	std::vector<cv::DMatch> matches;
-	std::map<cv::Point, FeatureDataPoint> newfdps;
-	cv::Mat descs;
-	std::map<cv::Point, FeatureDataPoint>::iterator it;
-	std::vector<cv::KeyPoint> ks;
-	cv::Mat FFTWindow(0, pp.iMinWidth * pp.iMinHeight, CV_8UC1);
+	//std::vector<cv::KeyPoint> kps;
+	//std::vector<cv::DMatch> matches;
+	//std::map<cv::Point, FeatureDataPoint> newfdps;
+	//cv::Mat descs;
+	//std::map<cv::Point, FeatureDataPoint>::iterator it;
+	//std::vector<cv::KeyPoint> ks;
+	//cv::Mat FFTWindow(0, pp.iMinWidth * pp.iMinHeight, CV_8UC1);
 
 	//cv::BRISK::create();
 	//cv::ORB::create();
@@ -606,8 +606,8 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	//cv::xfeatures2d::FASTForPointSet();
 
 	//featDetector = cv::xfeatures2d::SIFT::create();
-	featDetector = cv::xfeatures2d::SURF::create();
-	((cv::xfeatures2d::SURF*)featDetector.get())->setHessianThreshold(2000);
+	//featDetector = cv::xfeatures2d::SURF::create();
+	//((cv::xfeatures2d::SURF*)featDetector.get())->setHessianThreshold(2000);
 	
 	cv::Mat err, lastframe;
 	std::vector<cv::Mat> pyramid, nextpyr;
@@ -619,7 +619,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	time_t start = time(NULL);
 	int iBaseFrame = 0;
 	//cv::BFMatcher::create();
-	matcher = cv::FlannBasedMatcher::create();
+	//matcher = cv::FlannBasedMatcher::create();
 	//matcher = cv::FlannBasedMatcher::FlannBasedMatcher();
 	ResizeStartParams params = {};
 	params.bPaused = bPaused;
@@ -644,6 +644,18 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 		}
 		int iJump;
 		if ((iJump = *iJumpFrame) != -1) {
+			int doCancel = 1;
+			params.pCancel = &doCancel;
+			resizeProc.join(); //to avoid race conditions and properly synchronize, restart option utilized for jump
+			drawParams.pCancel = &doCancel;
+			drawProc.join();
+			drawParams.pCancel = pCancel;
+			while (!drawParams.drawQueue.empty()) drawParams.drawQueue.pop();
+			params.pCancel = pCancel;
+			params.FrameCount = iJump;
+			while (!params.imgQueue.empty()) params.imgQueue.pop();
+			while (!params.procImgQueue.empty()) params.procImgQueue.pop();
+
 			iBaseFrame = iJump;
 			*iJumpFrame = -1;
 			pvc.set(CV_CAP_PROP_POS_FRAMES, pp.noProcessing ? iJump : ((iJump > frameHistory) ? iJump - frameHistory : 0)); //CV_CAP_PROP_POS_MSEC
@@ -659,23 +671,13 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 			ft.clear();
 			pyramid.clear(); nextstatus.clear(); nextpts.clear(); nextellipse = cv::Mat();
 			lastkps.clear();
-			lastdescs = cv::Mat();
-			fdps.clear();
+			//lastdescs = cv::Mat();
+			//fdps.clear();
 			cumulativeMask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
-			FFTWindow = cv::Mat(0, pp.iMinWidth * pp.iMinHeight, CV_8UC1);
+			//FFTWindow = cv::Mat(0, pp.iMinWidth * pp.iMinHeight, CV_8UC1);
 			FrameCount = iJump;
 			start = time(NULL);
-			{
-				std::lock_guard<std::mutex> lock(drawParams.m);
-				while (!drawParams.drawQueue.empty()) drawParams.drawQueue.pop();
-			}
-			int doCancel = 1;
-			params.pCancel = &doCancel;
-			resizeProc.join(); //to avoid race conditions and properly synchronize, restart option utilized for jump
-			params.pCancel = pCancel;
-			params.FrameCount = iJump;
-			while (!params.imgQueue.empty()) params.imgQueue.pop();
-			while (!params.procImgQueue.empty()) params.procImgQueue.pop();
+			drawProc = std::thread(&DrawProcessor, std::ref(drawParams));
 			resizeProc = std::thread(&ResizeProcessor, std::ref(params));
 		}
 
