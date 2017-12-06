@@ -687,9 +687,10 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 			vc.retrieve(img);
 		}*/
 		//pvc >> frame; //calls read which is the same as grab/retrieve combined
-		while (params.imgQueue.size() == 0) {
+		while (params.imgQueue.size() == 0 && !*pCancel) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
+		if (*pCancel) break;
 		{
 			std::lock_guard<std::mutex> lock(params.m);
 			frame = params.imgQueue.front();
@@ -715,9 +716,10 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				//conversion for processing
 				//if (pp.iMinHeight != 0 || pp.iMinWidth != 0) cv::resize(frame, frame, cv::Size(pp.iMinWidth, pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
 				//if (pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
-				while (params.procImgQueue.size() == 0) {
+				while (params.procImgQueue.size() == 0 && !*pCancel) {
 					std::this_thread::sleep_for(std::chrono::milliseconds(10));
 				}
+				if (*pCancel) break;
 				{
 					std::lock_guard<std::mutex> lock(params.m);
 					frame = params.procImgQueue.front();
