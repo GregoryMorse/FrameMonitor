@@ -53,6 +53,7 @@ struct ProcessParams
 	bool drawContours;
 	bool drawFeaturePoints;
 	bool drawMatches;
+	bool combinedGraph;
 	bool noProcessing;
 };
 
@@ -134,28 +135,31 @@ void SmoothData(std::vector<int> & v, std::vector<double> & vals,
 	std::vector<std::pair<double, double>> & minmaxes,
 	std::vector<double> & pcts, int valbase)
 {
-	/*cv::KalmanFilter kf(2, 1, 0);
-	cv::Mat state(2, 1, CV_32F);
-	cv::Mat processNoise(2, 1, CV_32F);
-	cv::Mat measurement = cv::Mat::zeros(1, 1, CV_32F);
-	kf.transitionMatrix = (cv::Mat_<float>(2, 2) << 1, 1, 0, 1);
-	cv::setIdentity(kf.measurementMatrix);
-	cv::setIdentity(kf.processNoiseCov, cv::Scalar::all(1e-5));
-	cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
-	cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
-	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [vals, minmaxes, &measurement, &kf](int idx) ->
-		double { measurement.at<float>(0) = *minmaxes[idx].second - *minmaxes[idx].first == 0 ? 0 : (vals[idx] - *minmaxes[idx].first) / (*minmaxes[idx].second - *minmaxes[idx].first); kf.correct(measurement); return kf.predict().at<float>(0); });*/
-
-	std::vector<double> normpcts;
-	int base = *v.begin();
-	std::transform(v.begin(), v.end(), std::back_inserter(normpcts), [&vals, &minmaxes, base, valbase](int idx) ->
-		double { return minmaxes[idx - base].second - minmaxes[idx - base].first == 0 ? 0 : (vals[idx - valbase] - minmaxes[idx - base].first) / (minmaxes[idx - base].second - minmaxes[idx - base].first); });
-	//window size should be configurable...
-	int sz = normpcts.size();
-	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [&normpcts, sz, base](int idx) ->
-		double { return ((idx - base >= 3 ? normpcts[idx - base - 3] : 0) + (idx - base >= 2 ? normpcts[idx - base - 2] : 0) + (idx - base >= 1 ? normpcts[idx - base - 1] : 0) + normpcts[idx - base] +
-				(idx - base + 2 <= sz ? normpcts[idx - base + 1] : 0) + (idx - base + 3 <= sz ? normpcts[idx - base + 2] : 0) + (idx - base + 4 <= sz ? normpcts[idx - base + 3] : 0)) /
-			((idx - base >= 3 ? 1 : 0) + (idx - base >= 2 ? 1 : 0) + (idx - base >= 1 ? 1 : 0) + 1 + (idx - base + 2 <= sz ? 1 : 0) + (idx - base + 3 <= sz ? 1 : 0) + (idx - base + 4 <= sz ? 1 : 0)); });
+	bool bKalman = false;
+	if (bKalman) {
+		cv::KalmanFilter kf(2, 1, 0);
+		cv::Mat state(2, 1, CV_32F);
+		cv::Mat processNoise(2, 1, CV_32F);
+		cv::Mat measurement = cv::Mat::zeros(1, 1, CV_32F);
+		kf.transitionMatrix = (cv::Mat_<float>(2, 2) << 1, 1, 0, 1);
+		cv::setIdentity(kf.measurementMatrix);
+		cv::setIdentity(kf.processNoiseCov, cv::Scalar::all(1e-5));
+		cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
+		cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
+		std::transform(v.begin(), v.end(), std::back_inserter(pcts), [vals, minmaxes, &measurement, &kf](int idx) ->
+			double { measurement.at<float>(0) = minmaxes[idx].second - minmaxes[idx].first == 0 ? 0 : (vals[idx] - minmaxes[idx].first) / (minmaxes[idx].second - minmaxes[idx].first); kf.correct(measurement); return kf.predict().at<float>(0); });
+	} else {
+		std::vector<double> normpcts;
+		int base = *v.begin();
+		std::transform(v.begin(), v.end(), std::back_inserter(normpcts), [&vals, &minmaxes, base, valbase](int idx) ->
+			double { return minmaxes[idx - base].second - minmaxes[idx - base].first == 0 ? 0 : (vals[idx - valbase] - minmaxes[idx - base].first) / (minmaxes[idx - base].second - minmaxes[idx - base].first); });
+		//window size should be configurable...
+		int sz = normpcts.size();
+		std::transform(v.begin(), v.end(), std::back_inserter(pcts), [&normpcts, sz, base](int idx) ->
+			double { return ((idx - base >= 3 ? normpcts[idx - base - 3] : 0) + (idx - base >= 2 ? normpcts[idx - base - 2] : 0) + (idx - base >= 1 ? normpcts[idx - base - 1] : 0) + normpcts[idx - base] +
+			(idx - base + 2 <= sz ? normpcts[idx - base + 1] : 0) + (idx - base + 3 <= sz ? normpcts[idx - base + 2] : 0) + (idx - base + 4 <= sz ? normpcts[idx - base + 3] : 0)) /
+				((idx - base >= 3 ? 1 : 0) + (idx - base >= 2 ? 1 : 0) + (idx - base >= 1 ? 1 : 0) + 1 + (idx - base + 2 <= sz ? 1 : 0) + (idx - base + 3 <= sz ? 1 : 0) + (idx - base + 4 <= sz ? 1 : 0)); });
+	}
 }
 
 void findFrequencyMinMax(int freq, std::vector<double> & pcts, std::set<int> & maxindexes, std::set<int> & minindexes)
@@ -287,7 +291,7 @@ struct DrawStartParams
 void DrawProcessor(DrawStartParams& p)
 {
 	DrawItem di;
-	std::vector<double> pcts1, pcts2, pcts3, pcts;
+	std::vector<double> pcts1, pcts2, pcts3, pcts, vals;
 	std::set<int> maxindexes, minindexes;
 	cv::Mat canvas;
 	char buf[256];
@@ -295,10 +299,12 @@ void DrawProcessor(DrawStartParams& p)
 	time_t now;
 	int baseLine;
 	int i, ms, base, breaths;
-	double d, pct;
+	double d, pct, lastpct;
 	cv::Mat timeline;
 	cv::Size s;
 	std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax;
+	std::vector<std::pair<double, double>> minmaxes;
+	std::vector<int> v;
 	while (!*p.pCancel) {
 		while (p.drawQueue.size() == 0 && !*p.pCancel) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -346,133 +352,149 @@ void DrawProcessor(DrawStartParams& p)
 				timeline.copyTo(canvas(cv::Rect(0, 420, std::min(640, (int)ms), 30)));
 			}
 
-			/*if (oscillations.size() != 0) {
-			//how to smooth the jagged data - sliding window average, Kalman filter
-			cv::Mat timeline = cv::Mat::zeros(30, std::max(640, (int)(oscillations.size() * 1)), CV_8UC3);
-			int breaths = 0;
-			//normalizing and smoothing could be generalized to a transform lambda with mutable capture accumulating?
-			//if (dMaxOsc != 0) {
-			double lastpct = 0;
-			std::vector<double> vals;
-			std::vector<int> v(oscillations.size());
-			std::iota(v.begin(), v.end(), 0);
-			std::transform(v.begin(), v.end(), std::back_inserter(vals),
-			[oscillations, oscCount](int idx) ->
-			double { return oscCount[idx] == 0 ? 0: oscillations[idx] / oscCount[idx]; });
-			std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
-			std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals](int idx) ->
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
-			{ return std::minmax_element(vals.begin() + std::max(0, idx - 25), vals.begin() + std::min(idx + 25, (int)vals.size())); });
-			std::vector<double> pcts;
-			SmoothData(v, vals, minmaxes, pcts);
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
-			std::set<int> maxindexes, minindexes;
-			findFrequencyMinMax(25, pcts, maxindexes, minindexes);
-			for (int i = 0; i < vals.size(); i++) {
-			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
-			if (maxindexes.find(i) != maxindexes.end()) {
-			cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
-			breaths++;
-			} else if (minindexes.find(i) != minindexes.end()) {
-			cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
-			breaths++;
-			}
-			timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
-			lastpct = pct;
-			}
-			//}
-			if (oscillations.size() * 1 > 640) cv::resize(timeline, timeline, cv::Size(640, 30), cv::INTER_MAX);
-			timeline.copyTo(canvas(cv::Rect(0, 450, 640, 30)));
+			if (!p.pp.combinedGraph) {
+				if (di.oscillations.size() != 0) {
+					//how to smooth the jagged data - sliding window average, Kalman filter
+					timeline = cv::Mat::zeros(30, std::min(640, (int)(di.oscillations.size() * dScale)), CV_8UC3);
+					breaths = 0;
+					//normalizing and smoothing could be generalized to a transform lambda with mutable capture accumulating?
+					//if (dMaxOsc != 0) {
+					lastpct = 0;
+					vals.clear();
+					v.resize(std::min(std::min(640, (int)(di.oscillations.size() * dScale)), (int)di.oscillations.size()));
+					std::iota(v.begin(), v.end(), std::max(0, (int)di.oscillations.size() - std::min(640, (int)(di.oscillations.size() * dScale))));
+					base = *v.begin();
+					std::transform(v.begin(), v.end(), std::back_inserter(vals),
+						[&di](int idx) ->
+						double { return di.oscCount[idx] == 0 ? 0 : di.oscillations[idx] / di.oscCount[idx]; });
+					minmaxes.clear();
+					std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals, base](int idx) ->
+						std::pair<double, double>
+					{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
+						std::minmax_element(vals.begin() + std::max(0, idx - base - 25), vals.begin() + std::min(idx - base + 25, (int)vals.size()));
+					return std::pair<double, double>(*minmax.first, *minmax.second); });
+					pcts.clear();
+					SmoothData(v, vals, minmaxes, pcts, base);
+					dMinMax = std::minmax_element(pcts.begin(), pcts.end());
+					maxindexes.clear();
+					minindexes.clear();
+					findFrequencyMinMax(25, pcts, maxindexes, minindexes);
+					for (i = 0; i < vals.size(); i++) {
+						pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
+						if (maxindexes.find(i) != maxindexes.end()) {
+							cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
+							breaths++;
+						}
+						else if (minindexes.find(i) != minindexes.end()) {
+							cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
+							breaths++;
+						}
+						if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 29 * lastpct), cv::Point(i * dScale, 29 * pct), cv::Vec3b(255, 255, 255));
+						//timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
+						lastpct = pct;
+					}
+					//}
+					//cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(di.oscillations.size() * dScale)), 30), cv::INTER_MAX);
+					timeline.copyTo(canvas(cv::Rect(0, 450, std::min(640, (int)(di.oscillations.size() * dScale)), 30)));
 
-			char buf[256];
-			sprintf(buf, "Breaths: %lu (feature points)", breaths / 2);
-			int baseLine = 0;
-			cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-			cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 450 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
-			}
+					sprintf(buf, "Breaths: %lu (feature points)", breaths / 2);
+					baseLine = 0;
+					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+					cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 450 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+				}
 
-			if (ft.size() != 0) {
-			std::vector<int> v(ft.size());
-			std::iota(v.begin(), v.end(), 0);
-			std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
-			std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&ft](int idx) ->
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
-			{ return std::minmax_element(ft.begin() + std::max(0, idx - 25), ft.begin() + std::min(idx + 25, (int)ft.size())); });
-			std::vector<double> pcts;
-			SmoothData(v, ft, minmaxes, pcts);
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
-			std::set<int> maxindexes, minindexes;
-			findFrequencyMinMax(25, pcts, maxindexes, minindexes);
-			cv::Mat timeline = cv::Mat::zeros(30, ft.size() * dScale, CV_8UC3);
-			int breaths = 0;
-			for (int i = 0; i < ft.size(); i++) {
-			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
-			if (maxindexes.find(i) != maxindexes.end()) {
-			cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
-			breaths++;
-			} else if (minindexes.find(i) != minindexes.end()) {
-			cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
-			breaths++;
-			}
-			timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
-			}
-			cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(ft.size() * dScale)), 30), cv::INTER_MAX);
-			timeline.copyTo(canvas(cv::Rect(0, 480, std::min(640, (int)(ft.size() * dScale)), 30)));
+				if (di.ft.size() != 0) {
+					v.resize(std::min(std::min(640, (int)(di.ft.size() * dScale)), (int)di.ft.size()));
+					std::iota(v.begin(), v.end(), std::max(0, (int)di.ft.size() - std::min(640, (int)(di.ft.size() * dScale))));
+					base = *v.begin();
+					minmaxes.clear();
+					std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&di](int idx) ->
+						std::pair<double, double>
+					{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
+						std::minmax_element(di.ft.begin() + std::max(0, idx - 25), di.ft.begin() + std::min(idx + 25, (int)di.ft.size()));
+					return std::pair<double, double>(*minmax.first, *minmax.second); });
+					pcts.clear();
+					SmoothData(v, di.ft, minmaxes, pcts, 0);
+					dMinMax = std::minmax_element(pcts.begin(), pcts.end());
+					maxindexes.clear();
+					minindexes.clear();
+					findFrequencyMinMax(25, pcts, maxindexes, minindexes);
+					timeline = cv::Mat::zeros(30, std::min(640, (int)(di.ft.size() * dScale)), CV_8UC3);
+					breaths = 0;
+					for (i = 0; i < pcts.size(); i++) {
+						pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
+						if (maxindexes.find(i) != maxindexes.end()) {
+							cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
+							breaths++;
+						}
+						else if (minindexes.find(i) != minindexes.end()) {
+							cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
+							breaths++;
+						}
+						if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 29 * lastpct), cv::Point(i * dScale, 29 * pct), cv::Vec3b(255, 255, 255));
+						//timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
+						lastpct = pct;
+					}
+					//cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(di.ft.size() * dScale)), 30), cv::INTER_MAX);
+					timeline.copyTo(canvas(cv::Rect(0, 480, std::min(640, (int)(di.ft.size() * dScale)), 30)));
 
-			char buf[256];
-			sprintf(buf, "Breaths: %lu (light intensity)", breaths / 2);
-			int baseLine = 0;
-			cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-			cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 480 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
-			}
+					sprintf(buf, "Breaths: %lu (light intensity)", breaths / 2);
+					baseLine = 0;
+					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+					cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 480 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+				}
 
-			if (motionDetected.size() != 0) {
-			//total range of motion area is stable, maximum found (probably should only consider a window here as well)
-			//motion detected percentage depends on camera view and if camera moves changes dynamically
-			//in a stable case, it depends on the sharpness of features in breathing region
-			//must filter out oscillation wave based on 2 thresholds
-			cv::Mat timeline = cv::Mat::zeros(30, motionDetected.size() * dScale, CV_8UC3);
-			std::vector<int> v(motionDetected.size());
-			std::iota(v.begin(), v.end(), 0);
-			std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
-			std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&motionDetected](int idx) ->
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator>
-			{ return std::minmax_element(motionDetected.begin() + std::max(0, idx - 25), motionDetected.begin() + std::min(idx + 25, (int)motionDetected.size())); });
-			std::vector<double> pcts;
-			SmoothData(v, motionDetected, minmaxes, pcts);
-			std::pair<std::vector<double>::iterator, std::vector<double>::iterator> dMinMax = std::minmax_element(pcts.begin(), pcts.end());
-			std::set<int> maxindexes, minindexes;
-			findFrequencyMinMax(25, pcts, maxindexes, minindexes);
-			int breaths = 0;
-			double lastpct = 0;
-			for (int i = 0; i < motionDetected.size(); i++) {
-			double pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
-			//log(exp(N) * Value) / N brings normalized value to logarithmic scale with correctly chosen N factor which is big enough to bring all values above 1
-			//log(1+Value) also works
-			//double pct = d == 0 ? 0 : motionDetected[i] / d; //if (pct > 1.0) pct = 1.0; if (pct > .001) pct = .001; pct *= 1000;
-			//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
-			//pct = log(1 + pct * (exp(1) - 1));
-			if (maxindexes.find(i) != maxindexes.end()) {
-			cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
-			breaths++;
-			} else if (minindexes.find(i) != minindexes.end()) {
-			cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
-			breaths++;
-			}
-			timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
-			lastpct = pct;
-			}
-			cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(motionDetected.size() * dScale)), 30), cv::INTER_MAX);
-			timeline.copyTo(canvas(cv::Rect(0, 510, std::min(640, (int)(motionDetected.size() * dScale)), 30)));
+				if (di.motionDetected.size() != 0) {
+					//total range of motion area is stable, maximum found (probably should only consider a window here as well)
+					//motion detected percentage depends on camera view and if camera moves changes dynamically
+					//in a stable case, it depends on the sharpness of features in breathing region
+					//must filter out oscillation wave based on 2 thresholds
+					timeline = cv::Mat::zeros(30, std::min(640, (int)(di.motionDetected.size() * dScale)), CV_8UC3);
+					v.resize(std::min(std::min(640, (int)(di.motionDetected.size() * dScale)), (int)di.motionDetected.size()));
+					std::iota(v.begin(), v.end(), std::max(0, (int)di.motionDetected.size() - std::min(640, (int)(di.motionDetected.size() * dScale))));
+					base = *v.begin();
+					minmaxes.clear();
+					std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&di](int idx) ->
+						std::pair<double, double>
+					{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax = 
+						std::minmax_element(di.motionDetected.begin() + std::max(0, idx - 25), di.motionDetected.begin() + std::min(idx + 25, (int)di.motionDetected.size()));
+					return std::pair<double, double>(*minmax.first, *minmax.second); });
+					pcts.clear();
+					SmoothData(v, di.motionDetected, minmaxes, pcts, 0);
+					dMinMax = std::minmax_element(pcts.begin(), pcts.end());
+					maxindexes.clear();
+					minindexes.clear();
+					findFrequencyMinMax(25, pcts, maxindexes, minindexes);
+					breaths = 0;
+					lastpct = 0;
+					for (i = 0; i < pcts.size(); i++) {
+						pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
+						//log(exp(N) * Value) / N brings normalized value to logarithmic scale with correctly chosen N factor which is big enough to bring all values above 1
+						//log(1+Value) also works
+						//double pct = d == 0 ? 0 : motionDetected[i] / d; //if (pct > 1.0) pct = 1.0; if (pct > .001) pct = .001; pct *= 1000;
+						//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
+						//pct = log(1 + pct * (exp(1) - 1));
+						if (maxindexes.find(i) != maxindexes.end()) {
+							cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
+							breaths++;
+						}
+						else if (minindexes.find(i) != minindexes.end()) {
+							cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
+							breaths++;
+						}
+						if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 29 * lastpct), cv::Point(i * dScale, 29 * pct), cv::Vec3b(255, 255, 255));
+						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
+						lastpct = pct;
+					}
+					//cv::resize(timeline, timeline, cv::Size(std::min(640, (int)(di.motionDetected.size() * dScale)), 30), cv::INTER_MAX);
+					timeline.copyTo(canvas(cv::Rect(0, 510, std::min(640, (int)(di.motionDetected.size() * dScale)), 30)));
 
-			char buf[256];
-			sprintf(buf, "Breaths: %lu (motion area)", breaths / 2);
-			int baseLine = 0;
-			cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-			cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 510 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
-			}*/
-
-			if (ms != 0) {
+					sprintf(buf, "Breaths: %lu (motion area)", breaths / 2);
+					baseLine = 0;
+					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+					cv::putText(canvas, cv::String(buf), cv::Point((640 - s.width) / 2, 510 + 10), cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 255, 255));
+				}
+			} else if (ms != 0) {
 				timeline = cv::Mat::zeros(90, std::min(640, (int)(ms * dScale)), CV_8UC3);
 				pcts.clear(); pcts1.clear(); pcts2.clear(); pcts3.clear(); maxindexes.clear(); minindexes.clear();
 				calcResults(di.motionDetected, di.oscillations, di.oscCount, di.ft, pcts1, pcts2, pcts3, pcts, maxindexes, minindexes, std::min(640, (int)(ms * dScale)));
@@ -1155,7 +1177,7 @@ int main(int argc, char** argv)
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
 	params.playbackRate = 1000;
-	params.pp = ProcessParams{ true, 200, 150, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, false };
+	params.pp = ProcessParams{ true, 200, 150, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, true, false };
 	if (params.pp.noProcessing) params.breathPos.clear();
 	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
