@@ -1152,7 +1152,8 @@ void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 
 int main(int argc, char** argv)
 {
-	cvNamedWindow(WINDOWNAME, CV_WINDOW_NORMAL | CV_WINDOW_KEEPRATIO);
+	cv::getWindowProperty();
+	cv::namedWindow(WINDOWNAME, CV_WINDOW_NORMAL | CV_WINDOW_KEEPRATIO);
 	StartParams params = { };
 	params.pvc = new cv::VideoCapture();
 	//1440x1080 vidoes or 4:3 aspect ratio
@@ -1286,7 +1287,7 @@ int main(int argc, char** argv)
 		}
 		breathfile.close();
 	}
-	cvDestroyWindow(WINDOWNAME);
+	cv::destroyWindow(WINDOWNAME);
 	VideoCleanup((void*)params.pvc);
 	return 0;
 }
