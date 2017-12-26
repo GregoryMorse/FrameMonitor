@@ -93,12 +93,12 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(UserProfile)\Documents\My Libraries\opencv331\opencv\build\include\;$(UserProfile)\Documents\My Libraries\opencv_contrib331\modules\xfeatures2d\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(UserProfile)\Documents\My Libraries\opencv340\opencv\build\include\;$(UserProfile)\Documents\My Libraries\opencv_contrib-3.4.0\modules\xfeatures2d\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalLibraryDirectories>$(UserProfile)\Documents\my libraries\opencv.new\build\x86\vc15std\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_xfeatures2d331d.lib;opencv_features2d331d.lib;opencv_flann331d.lib;opencv_highgui331d.lib;opencv_core331d.lib;opencv_imgcodecs331d.lib;opencv_imgproc331d.lib;opencv_video331d.lib;opencv_videoio331d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_xfeatures2d340d.lib;opencv_features2d340d.lib;opencv_flann340d.lib;opencv_highgui340d.lib;opencv_core340d.lib;opencv_imgcodecs340d.lib;opencv_imgproc340d.lib;opencv_video340d.lib;opencv_videoio340d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -111,9 +111,9 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*331d.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg331.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*331d.pdb" "$(OutDir)" /d</Command>
+      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340d.dll" "$(OutDir)" /d
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg340.dll" "$(OutDir)" /d
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340d.pdb" "$(OutDir)" /d</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -123,11 +123,11 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*3
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(UserProfile)\Documents\My Libraries\opencv331\opencv\build\include\;$(UserProfile)\Documents\My Libraries\opencv_contrib331\modules\xfeatures2d\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(UserProfile)\Documents\My Libraries\opencv340\opencv\build\include\;$(UserProfile)\Documents\My Libraries\opencv_contrib-3.4.0\modules\xfeatures2d\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>opencv_xfeatures2d331d.lib;opencv_features2d331d.lib;opencv_flann331d.lib;opencv_highgui331d.lib;opencv_core331d.lib;opencv_imgcodecs331d.lib;opencv_imgproc331d.lib;opencv_video331d.lib;opencv_videoio331d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ippiw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_xfeatures2d340d.lib;opencv_features2d340d.lib;opencv_flann340d.lib;opencv_highgui340d.lib;opencv_core340d.lib;opencv_imgcodecs340d.lib;opencv_imgproc340d.lib;opencv_video340d.lib;opencv_videoio340d.lib;ittnotifyd.lib;libjasperd.lib;libjpegd.lib;libpngd.lib;libtiffd.lib;libwebpd.lib;zlibd.lib;ippicvmt.lib;ippiw.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(UserProfile)\Documents\my libraries\opencv.new\build\x64\vc15std\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
@@ -141,9 +141,9 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*3
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*331d.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg331_64.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*331d.pdb" "$(OutDir)" /d</Command>
+      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340d.dll" "$(OutDir)" /d
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg340_64.dll" "$(OutDir)" /d
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340d.pdb" "$(OutDir)" /d</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -155,13 +155,13 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*3
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(UserProfile)\Documents\My Libraries\opencv331\opencv\build\include\;$(UserProfile)\Documents\My Libraries\opencv_contrib331\modules\xfeatures2d\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(UserProfile)\Documents\My Libraries\opencv340\opencv\build\include\;$(UserProfile)\Documents\My Libraries\opencv_contrib-3.4.0\modules\xfeatures2d\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>opencv_xfeatures2d331.lib;opencv_features2d331.lib;opencv_flann331.lib;opencv_highgui331.lib;opencv_core331.lib;opencv_imgcodecs331.lib;opencv_imgproc331.lib;opencv_video331.lib;opencv_videoio331.lib;ittnotify.lib;libjasper.lib;libjpeg.lib;libpng.lib;libtiff.lib;libwebp.lib;zlib.lib;ippicvmt.lib;ippiw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_xfeatures2d340.lib;opencv_features2d340.lib;opencv_flann340.lib;opencv_highgui340.lib;opencv_core340.lib;opencv_imgcodecs340.lib;opencv_imgproc340.lib;opencv_video340.lib;opencv_videoio340.lib;ittnotify.lib;libjasper.lib;libjpeg.lib;libpng.lib;libtiff.lib;libwebp.lib;zlib.lib;ippicvmt.lib;ippiw.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(UserProfile)\Documents\my libraries\opencv.new\build\x86\vc15std\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
@@ -175,8 +175,8 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*3
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*331.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg331.dll" "$(OutDir)" /d</Command>
+      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340.dll" "$(OutDir)" /d
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg340.dll" "$(OutDir)" /d</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -188,13 +188,13 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\op
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(UserProfile)\Documents\My Libraries\opencv331\opencv\build\include\;$(UserProfile)\Documents\My Libraries\opencv_contrib331\modules\xfeatures2d\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(UserProfile)\Documents\My Libraries\opencv340\opencv\build\include\;$(UserProfile)\Documents\My Libraries\opencv_contrib-3.4.0\modules\xfeatures2d\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>opencv_xfeatures2d331.lib;opencv_features2d331.lib;opencv_flann331.lib;opencv_highgui331.lib;opencv_core331.lib;opencv_imgcodecs331.lib;opencv_imgproc331.lib;opencv_video331.lib;opencv_videoio331.lib;ittnotify.lib;libjasper.lib;libjpeg.lib;libpng.lib;libtiff.lib;libwebp.lib;zlib.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_xfeatures2d340.lib;opencv_features2d340.lib;opencv_flann340.lib;opencv_highgui340.lib;opencv_core340.lib;opencv_imgcodecs340.lib;opencv_imgproc340.lib;opencv_video340.lib;opencv_videoio340.lib;ittnotify.lib;libjasper.lib;libjpeg.lib;libpng.lib;libtiff.lib;libwebp.lib;zlib.lib;ippicvmt.lib;ipp_iw.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(UserProfile)\Documents\my libraries\opencv.new\build\x64\vc15std\lib\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Midl>
@@ -208,8 +208,8 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\op
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*331.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg331_64.dll" "$(OutDir)" /d</Command>
+      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340.dll" "$(OutDir)" /d
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg340_64.dll" "$(OutDir)" /d</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
