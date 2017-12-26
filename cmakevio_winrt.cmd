@@ -25,10 +25,10 @@ MKDIR build\%2\vc%VSVER%%pfix%
 
 CD build\%2\vc%VSVER%%pfix%
 DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug %cmdopts% -DBUILD_SHARED_LIBS=%4 -DBUILD_WITH_STATIC_CRT=%4 -DOPENCV_EXTRA_MODULES_PATH=../../../../../opencv_contrib331/modules -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
+%COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug %cmdopts% -DBUILD_SHARED_LIBS=%4 -DBUILD_WITH_STATIC_CRT=%4 -DOPENCV_EXTRA_MODULES_PATH=../../../../../opencv_contrib-3.4.0/modules -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
 %COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video && nmake.exe opencv_highgui && nmake.exe opencv_xfeatures2d"
 DEL CMakeCache.txt
-%COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo %cmdopts% -DBUILD_SHARED_LIBS=%4 -DBUILD_WITH_STATIC_CRT=%4 -DOPENCV_EXTRA_MODULES_PATH=../../../../../opencv_contrib331/modules -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
+%COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && %cmakedir% -G"NMake Makefiles" -DCMAKE_BUILD_TYPE=RelWithDebInfo %cmdopts% -DBUILD_SHARED_LIBS=%4 -DBUILD_WITH_STATIC_CRT=%4 -DOPENCV_EXTRA_MODULES_PATH=../../../../../opencv_contrib-3.4.0/modules -DWITH_FFMPEG=ON -DWITH_MSMF=ON -DWITH_DSHOW=OFF -DWITH_VFW=OFF -DWITH_OPENEXR=OFF -DWITH_CUDA=OFF -DBUILD_opencv_gpu=OFF -DBUILD_opencv_python=OFF -DBUILD_opencv_java=OFF %sources%"
 %COMSPEC% /S /C "CALL "%msvc_vars%" && CD %CD% && nmake.exe opencv_videoio && nmake.exe opencv_video && nmake.exe opencv_highgui && nmake.exe opencv_xfeatures2d"
 CD ..\..\..
 
