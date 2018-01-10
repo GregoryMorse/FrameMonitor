@@ -113,7 +113,7 @@
     <PostBuildEvent>
       <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340d.dll" "$(OutDir)" /d
 xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg340.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340d.pdb" "$(OutDir)" /d</Command>
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340d.pdb" "$(OutDir)" /d /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -176,7 +176,7 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*3
     </ResourceCompile>
     <PostBuildEvent>
       <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg340.dll" "$(OutDir)" /d</Command>
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg340.dll" "$(OutDir)" /d /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -209,7 +209,7 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\op
     </ResourceCompile>
     <PostBuildEvent>
       <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg340_64.dll" "$(OutDir)" /d</Command>
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg340_64.dll" "$(OutDir)" /d /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
