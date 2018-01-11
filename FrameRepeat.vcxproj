@@ -111,8 +111,8 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340d.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg340.dll" "$(OutDir)" /d
+      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340d.dll" "$(OutDir)" /d /y
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg340.dll" "$(OutDir)" /d /y
 xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340d.pdb" "$(OutDir)" /d /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -141,9 +141,9 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*3
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340d.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg340_64.dll" "$(OutDir)" /d
-xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340d.pdb" "$(OutDir)" /d</Command>
+      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340d.dll" "$(OutDir)" /d /y
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg340_64.dll" "$(OutDir)" /d /y
+xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340d.pdb" "$(OutDir)" /d /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -175,7 +175,7 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*3
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340.dll" "$(OutDir)" /d
+      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\*340.dll" "$(OutDir)" /d /y
 xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\opencv_ffmpeg340.dll" "$(OutDir)" /d /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -208,7 +208,7 @@ xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x86\vc15std\bin\op
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340.dll" "$(OutDir)" /d
+      <Command>xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\*340.dll" "$(OutDir)" /d /y
 xcopy "$(UserProfile)\Documents\My Libraries\opencv.new\build\x64\vc15std\bin\opencv_ffmpeg340_64.dll" "$(OutDir)" /d /y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>

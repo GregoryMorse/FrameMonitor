@@ -219,12 +219,19 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 	std::vector<double> vals;
 	std::vector<int> v(windowSize == -1 ? ms : std::min(windowSize, ms));
 	std::iota(v.begin(), v.end(), windowSize == -1 ? 0 : std::max(0, ms - windowSize));
+	if (*v.begin() != 0) {
+		std::vector<int> w(*v.begin() <= 25 ? *v.begin() : 25);
+		std::iota(w.begin(), w.end(), *v.begin() <= 25 ? 0 : *v.begin() - 25);
+		std::transform(w.begin(), w.end(), std::back_inserter(vals),
+			[oscillations, oscCount](int idx) ->
+			double { return oscCount[idx] == 0 ? 0 : oscillations[idx] / oscCount[idx]; });
+	}
 	std::transform(v.begin(), v.end(), std::back_inserter(vals),
 		[oscillations, oscCount](int idx) ->
 		double { return oscCount[idx] == 0 ? 0 : oscillations[idx] / oscCount[idx]; });
 	std::vector<std::pair<double, double>> minmaxes;
 	int vs = vals.size();
-	int base = *v.begin();
+	int base = *v.begin() <= 25 ? 0 : *v.begin() - 25;
 	std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals, vs, base](int idx) ->
 		std::pair<double, double>
 	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
@@ -315,8 +322,9 @@ void DrawProcessor(DrawStartParams& p)
 			di = p.drawQueue.front();
 			p.drawQueue.pop();
 
-			double dWidth = cv::getWindowProperty(WINDOWNAME, cv::WindowPropertyFlags::WND_PROP_RO_WIDTH); if (dWidth == -1) dWidth = p.vi.dwWidthInPixels * 3 / 2;
-			double dHeight = cv::getWindowProperty(WINDOWNAME, cv::WindowPropertyFlags::WND_PROP_RO_HEIGHT); if (dHeight == -1) dHeight = p.vi.dwHeightInPixels + 150;
+			cv::Rect r = cv::getWindowImageRect(WINDOWNAME);
+			double dWidth = r.width; if (dWidth == -1 || dWidth == 0) dWidth = p.vi.dwWidthInPixels * 3 / 2;
+			double dHeight = r.height; if (dHeight == -1 || dHeight == 0) dHeight = p.vi.dwHeightInPixels + 150;
 
 			canvas = cv::Mat3b(dHeight, dWidth, cv::Vec3b(0, 0, 0));
 			//widthxheight, widthx60, width/2xheight/2, width/2xheight/2
@@ -728,8 +736,9 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 			//int chan = frame.channels(), type = frame.type(), depth = frame.depth(); //CV_8UC3
 			if (pp.noProcessing) {
 				if (pf != NULL) {
-					double dWidth = cv::getWindowProperty(WINDOWNAME, cv::WindowPropertyFlags::WND_PROP_RO_WIDTH); if (dWidth == -1) dWidth = vi.dwWidthInPixels * 3 / 2;
-					double dHeight = cv::getWindowProperty(WINDOWNAME, cv::WindowPropertyFlags::WND_PROP_RO_HEIGHT); if (dHeight == -1) dHeight = vi.dwHeightInPixels + 30;
+					cv::Rect r = cv::getWindowImageRect(WINDOWNAME);
+					double dWidth = r.width; if (dWidth == -1 || dWidth == 0) dWidth = vi.dwWidthInPixels * 3 / 2;
+					double dHeight = r.height; if (dHeight == -1 || dHeight == 0) dHeight = vi.dwHeightInPixels + 30;
 
 					cv::Mat canvas = cv::Mat3b((int)dHeight, (int)dWidth, cv::Vec3b(0, 0, 0));
 					//cv::resize(frame, frame, cv::Size((int)vi.dwWidthInPixels, (int)vi.dwHeightInPixels), cv::INTER_CUBIC);
@@ -1133,7 +1142,7 @@ void callbackPause(int, void* p)
 
 void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 {
-	double dWidth = cv::getWindowProperty(WINDOWNAME, cv::WindowPropertyFlags::WND_PROP_RO_WIDTH); if (dWidth == -1) dWidth = ((StartParams*)userdata)->vi.dwWidthInPixels * 3 / 2;
+	double dWidth = cv::getWindowImageRect(WINDOWNAME).width; if (dWidth == -1 || dWidth == 0) dWidth = ((StartParams*)userdata)->vi.dwWidthInPixels * 3 / 2;
 	cv::Rect button(dWidth - 20, 10, 20, 60);
 	if (event == cv::EVENT_LBUTTONDOWN) {
 		if (!button.contains(cv::Point(x, y))) ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
@@ -1218,8 +1227,8 @@ int main(int argc, char** argv)
 			char buf[256];
 			if (params.breathPos.size() != 0) {
 				dScale = 1;// params.pp.dDesiredFPS / params.vi.dFPS;
-				timeline = cv::Mat::zeros(30, std::min((int)mat.cols * 2 / 3, (1 + (int)((idx - params.iBaseFrame) * dScale))), CV_8UC3);
-				iBase = -1, sz = params.breathPos.size(), basePos = std::max(0, (int)((idx - params.iBaseFrame) * dScale) - (int)mat.cols * 2 / 3);
+				timeline = cv::Mat::zeros(30, std::min((int)mat.cols, (1 + (int)((idx - params.iBaseFrame) * dScale))), CV_8UC3);
+				iBase = -1, sz = params.breathPos.size(), basePos = std::max(0, (int)((idx - params.iBaseFrame) * dScale) - (int)mat.cols);
 				for (i = 0; i < sz; i++) {
 					if (params.breathPos[i] >= params.iBaseFrame && params.breathPos[i] <= idx) {
 						if ((params.breathPos[i] - params.iBaseFrame) * dScale < basePos) continue;
@@ -1230,7 +1239,7 @@ int main(int argc, char** argv)
 				}
 				//cv::resize(timeline, timeline, cv::Size(std::min((int)params.vi.dwWidthInPixels, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30), cv::INTER_MAX);
 
-				timeline.copyTo(mat(cv::Rect(0, mat.rows - 30, std::min((int)mat.cols * 2 / 3, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30)));
+				timeline.copyTo(mat(cv::Rect(0, mat.rows - 30, std::min((int)mat.cols, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30)));
 
 				sprintf(buf, "Breaths: %lu", iBase == -1 ? 0 : (i - iBase) / 2);
 				baseLine = 0;
