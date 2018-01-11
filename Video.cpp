@@ -131,7 +131,7 @@ double get_oscillation(std::vector<cv::KeyPoint> kpoints, cv::Point2f ReferenceP
 	return 0;
 }*/
 
-void SmoothData(std::vector<int> & v, std::vector<double> & vals,
+void SmoothData(std::vector<int> & v, std::vector<double>::iterator & vals,
 	std::vector<std::pair<double, double>> & minmaxes,
 	std::vector<double> & pcts, int valbase)
 {
@@ -237,7 +237,8 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
 		std::minmax_element(vals.begin() + std::max(0, idx - base - 25), vals.begin() + std::min(idx - base + 25, (int)vs));
 	return std::pair<double, double>(*minmax.first, *minmax.second); });
-	SmoothData(v, vals, minmaxes, pcts1, base);
+	base = *v.begin();
+	SmoothData(v, vals.begin() + (*v.begin() <= 25 ? *v.begin() : 25), minmaxes, pcts1, base);
 
 	//std::vector<int> v(ft.size());
 	//std::iota(v.begin(), v.end(), 0);
@@ -249,7 +250,7 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
 		std::minmax_element(ft.begin() + std::max(0, idx - 25), ft.begin() + std::min(idx + 25, (int)vs));
 	return std::pair<double, double>(*minmax.first, *minmax.second); });
-	SmoothData(v, ft, minmaxes, pcts2, 0);
+	SmoothData(v, ft.begin(), minmaxes, pcts2, 0);
 
 	//std::vector<int> v(ms);
 	//std::iota(v.begin(), v.end(), 0);
@@ -260,7 +261,7 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
 		std::minmax_element(motionDetected.begin() + std::max(0, idx - 25), motionDetected.begin() + std::min(idx + 25, (int)ms));
 	return std::pair<double, double>(*minmax.first, *minmax.second); });
-	SmoothData(v, motionDetected, minmaxes, pcts3, 0);
+	SmoothData(v, motionDetected.begin(), minmaxes, pcts3, 0);
 
 	std::vector<double> pcts;
 	std::transform(v.begin(), v.end(), std::back_inserter(pcts), [&pcts1, &pcts2, &pcts3, base](int idx) -> double { return pcts1[idx - base] + pcts2[idx - base] + pcts3[idx - base]; });
@@ -374,10 +375,17 @@ void DrawProcessor(DrawStartParams& p)
 					vals.clear();
 					v.resize(std::min(std::min((int)dWidth, (int)(di.oscillations.size() * dScale)), (int)di.oscillations.size()));
 					std::iota(v.begin(), v.end(), std::max(0, (int)di.oscillations.size() - std::min((int)dWidth, (int)(di.oscillations.size() * dScale))));
-					base = *v.begin();
+					if (*v.begin() != 0) {
+						std::vector<int> w(*v.begin() <= 25 ? *v.begin() : 25);
+						std::iota(w.begin(), w.end(), *v.begin() <= 25 ? 0 : *v.begin() - 25);
+						std::transform(w.begin(), w.end(), std::back_inserter(vals),
+							[&di](int idx) ->
+							double { return di.oscCount[idx] == 0 ? 0 : di.oscillations[idx] / di.oscCount[idx]; });
+					}
 					std::transform(v.begin(), v.end(), std::back_inserter(vals),
 						[&di](int idx) ->
 						double { return di.oscCount[idx] == 0 ? 0 : di.oscillations[idx] / di.oscCount[idx]; });
+					base = *v.begin() <= 25 ? 0 : *v.begin() - 25;
 					minmaxes.clear();
 					std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals, base](int idx) ->
 						std::pair<double, double>
@@ -385,7 +393,8 @@ void DrawProcessor(DrawStartParams& p)
 						std::minmax_element(vals.begin() + std::max(0, idx - base - 25), vals.begin() + std::min(idx - base + 25, (int)vals.size()));
 					return std::pair<double, double>(*minmax.first, *minmax.second); });
 					pcts.clear();
-					SmoothData(v, vals, minmaxes, pcts, base);
+					base = *v.begin();
+					SmoothData(v, vals.begin() + (*v.begin() <= 25 ? *v.begin() : 25), minmaxes, pcts, base);
 					dMinMax = std::minmax_element(pcts.begin(), pcts.end());
 					maxindexes.clear();
 					minindexes.clear();
@@ -425,7 +434,7 @@ void DrawProcessor(DrawStartParams& p)
 						std::minmax_element(di.ft.begin() + std::max(0, idx - 25), di.ft.begin() + std::min(idx + 25, (int)di.ft.size()));
 					return std::pair<double, double>(*minmax.first, *minmax.second); });
 					pcts.clear();
-					SmoothData(v, di.ft, minmaxes, pcts, 0);
+					SmoothData(v, di.ft.begin(), minmaxes, pcts, 0);
 					dMinMax = std::minmax_element(pcts.begin(), pcts.end());
 					maxindexes.clear();
 					minindexes.clear();
@@ -471,7 +480,7 @@ void DrawProcessor(DrawStartParams& p)
 						std::minmax_element(di.motionDetected.begin() + std::max(0, idx - 25), di.motionDetected.begin() + std::min(idx + 25, (int)di.motionDetected.size()));
 					return std::pair<double, double>(*minmax.first, *minmax.second); });
 					pcts.clear();
-					SmoothData(v, di.motionDetected, minmaxes, pcts, 0);
+					SmoothData(v, di.motionDetected.begin(), minmaxes, pcts, 0);
 					dMinMax = std::minmax_element(pcts.begin(), pcts.end());
 					maxindexes.clear();
 					minindexes.clear();
