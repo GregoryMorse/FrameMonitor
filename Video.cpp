@@ -55,6 +55,7 @@ struct ProcessParams
 	bool drawMatches;
 	bool combinedGraph;
 	bool noProcessing;
+	bool bSaveVid;
 };
 
 struct VidInfo
@@ -1177,7 +1178,6 @@ void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 
 int main(int argc, char** argv)
 {
-	cv::namedWindow(WINDOWNAME, CV_WINDOW_NORMAL | CV_WINDOW_KEEPRATIO);
 	StartParams params = { };
 	params.pvc = new cv::VideoCapture();
 	//1440x1080 vidoes or 4:3 aspect ratio
@@ -1202,8 +1202,10 @@ int main(int argc, char** argv)
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
 	params.playbackRate = 1000;
-	params.pp = ProcessParams{ true, 200, 150, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, true, false };
+	params.pp = ProcessParams{ true, 200, 150, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, true, false, true };
 	if (params.pp.noProcessing) params.breathPos.clear();
+	cv::namedWindow(WINDOWNAME, (params.pp.bSaveVid ? CV_WINDOW_AUTOSIZE : CV_WINDOW_NORMAL) | CV_WINDOW_KEEPRATIO);
+	cv::VideoWriter vw;
 	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
 	//cv::createButton(PAUSEBTN, callbackPause, &params, CV_PUSH_BUTTON);
@@ -1271,10 +1273,19 @@ int main(int argc, char** argv)
 				
 			cvSetTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
 			cv::imshow(WINDOWNAME, mat);
+			if (params.pp.bSaveVid) {
+				if (!vw.isOpened()) {
+					vw.open("op" + std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1),
+						vw.fourcc('D', 'I', 'V', 'X'), params.pp.dDesiredFPS, cv::Size(mat.cols, mat.rows), true);
+					//params.pvc->get(CV_CAP_PROP_FOURCC), params.vi.dFPS, cv::Size(params.vi.dwWidthInPixels, params.vi.dwHeightInPixels)
+				}
+				vw.write(mat);
+			}
 		}
 		elapsed = std::chrono::high_resolution_clock::now() - params.start;
 		c = cvWaitKey(idx == -1 ? 1 : std::max(1, (int)(params.playbackRate * params.iCurPos / params.vi.dFPS - elapsed.count()))); if (c == 27) break;
 	}
+	if (params.pp.bSaveVid) vw.release();
 	params.pc = 1;
 	vidProc.join();
 	if (params.pp.noProcessing && params.breathPos.size() != 0) {

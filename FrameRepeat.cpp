@@ -71,7 +71,7 @@ BOOL CFrameRepeatApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	std::string str(getenv("UserProfile"));
+	std::string str = "d:";// (getenv("UserProfile"));
 	str += "\\Downloads\\00082.MTS";
 	//str += "\\Downloads\\00086.MTS";
 	const char* szFname[] { str.data() };
