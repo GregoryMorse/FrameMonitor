@@ -400,7 +400,7 @@ void DrawProcessor(DrawStartParams& p)
 					maxindexes.clear();
 					minindexes.clear();
 					findFrequencyMinMax(25, pcts, maxindexes, minindexes);
-					for (i = 0; i < vals.size(); i++) {
+					for (i = 0; i < pcts.size(); i++) {
 						pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
 						if (maxindexes.find(i) != maxindexes.end()) {
 							cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
@@ -1202,7 +1202,7 @@ int main(int argc, char** argv)
 		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
 	}
 	params.playbackRate = 1000;
-	params.pp = ProcessParams{ true, 200, 150, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, true, false, true };
+	params.pp = ProcessParams{ true, 200, 150, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, false, false, true };
 	if (params.pp.noProcessing) params.breathPos.clear();
 	cv::namedWindow(WINDOWNAME, (params.pp.bSaveVid ? CV_WINDOW_AUTOSIZE : CV_WINDOW_NORMAL) | CV_WINDOW_KEEPRATIO);
 	cv::VideoWriter vw;
@@ -1275,7 +1275,7 @@ int main(int argc, char** argv)
 			cv::imshow(WINDOWNAME, mat);
 			if (params.pp.bSaveVid) {
 				if (!vw.isOpened()) {
-					vw.open("op" + std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1),
+					vw.open((params.pp.combinedGraph ? "op" : "sepop") + std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1),
 						vw.fourcc('D', 'I', 'V', 'X'), params.pp.dDesiredFPS, cv::Size(mat.cols, mat.rows), true);
 					//params.pvc->get(CV_CAP_PROP_FOURCC), params.vi.dFPS, cv::Size(params.vi.dwWidthInPixels, params.vi.dwHeightInPixels)
 				}
