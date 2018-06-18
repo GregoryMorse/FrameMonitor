@@ -3,8 +3,10 @@
 //
 
 #include "stdafx.h"
+#include <sstream>
 #include "FrameRepeat.h"
 #include "FrameRepeatDlg.h"
+#include "DeviceEnumerator.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -70,12 +72,26 @@ BOOL CFrameRepeatApp::InitInstance()
 	// TODO: You should modify this string to be something appropriate
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
-
-	std::string str = "d:";// (getenv("UserProfile"));
-	str += "\\Downloads\\00082.MTS";
-	//str += "\\Downloads\\00086.MTS";
-	const char* szFname[] { str.data() };
-	INT_PTR nResponse = main(1, (char**)szFname);
+	INT_PTR nResponse;
+	int SelectVid = 0;
+	if (SelectVid > 0) {
+		std::string str = "d:";// (getenv("UserProfile"));
+		str += SelectVid == 1 ? "\\Downloads\\00082.MTS" : "\\Downloads\\00086.MTS";
+		const char* szFname[]{ str.data() };
+		nResponse = main(1, (char**)szFname);
+	} else {
+		if (SelectVid == -1) {
+			DeviceEnumerator DE;
+			std::map<int, Device> devs = DE.getVideoDevicesMap();
+			std::ostringstream stringStream;
+			for (std::map<int, Device>::const_iterator i = devs.begin(); i != devs.end(); i++) {
+				stringStream << i->first << " " << i->second.id << " " << i->second.deviceName << " " << i->second.devicePath << std::endl;
+			}
+			std::string devStr = stringStream.str();
+			MessageBoxA(NULL, devStr.c_str(), "", MB_OK);
+		}
+		nResponse = main(0, (char**)"");
+	}
 	//CFrameRepeatDlg dlg;
 	//m_pMainWnd = &dlg;
 	//INT_PTR nResponse = dlg.DoModal();

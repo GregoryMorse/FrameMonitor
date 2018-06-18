@@ -22,7 +22,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{2DEEEB7E-9D16-4943-A382-7F4F4A317D7A}</ProjectGuid>
     <RootNamespace>FrameRepeat</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
     <Keyword>MFCProj</Keyword>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -220,6 +220,7 @@ xcopy "$(OCVBUILDPATH)\x64\vc15std\bin\opencv_ffmpeg341_64.dll" "$(OutDir)" /d /
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DeviceEnumerator.h" />
     <ClInclude Include="FrameRepeat.h" />
     <ClInclude Include="FrameRepeatDlg.h" />
     <ClInclude Include="Resource.h" />
@@ -228,6 +229,7 @@ xcopy "$(OCVBUILDPATH)\x64\vc15std\bin\opencv_ffmpeg341_64.dll" "$(OutDir)" /d /
     <ClInclude Include="TimelineStatic.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="DeviceEnumerator.cpp" />
     <ClCompile Include="FrameRepeat.cpp" />
     <ClCompile Include="FrameRepeatDlg.cpp" />
     <ClCompile Include="stdafx.cpp">
