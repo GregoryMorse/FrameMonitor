@@ -73,7 +73,7 @@ BOOL CFrameRepeatApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 	INT_PTR nResponse;
-	int SelectVid = 0;
+	int SelectVid = 1;
 	if (SelectVid > 0) {
 		std::string str = "d:";// (getenv("UserProfile"));
 		str += SelectVid == 1 ? "\\Downloads\\00082.MTS" : "\\Downloads\\00086.MTS";

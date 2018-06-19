@@ -218,7 +218,7 @@ void CFrameRepeatDlg::OnBnClickedOpenvideo()
 		if (m_VideoImg.GetSafeHwnd() != NULL) m_VideoImg.DestroyWindow();
 		RECT rect;
 		GetClientRect(&rect);
-		m_OpenTime = time(NULL);
+		m_OpenTime = (int)time(NULL);
 		if (m_Progress.GetSafeHwnd() == NULL) m_Progress.Create(WS_VISIBLE | WS_CHILD | PBS_SMOOTH, RECT{ rect.left + 10, rect.top + 10, rect.right - 10, rect.top + 10 + 50 }, this, IDC_PROGRESS);
 		if (m_ProgText.GetSafeHwnd() == NULL) m_ProgText.Create(_T("Waiting for video..."), WS_VISIBLE | WS_CHILD | SS_CENTER, RECT{ rect.left + 10, rect.top + 10 + 60, rect.right - 10, rect.bottom - 80 }, this, IDC_PROGTEXT);
 		m_pWorkThread = AfxBeginThread(VideoProcessor, this, 0, CREATE_SUSPENDED, NULL);
@@ -230,8 +230,8 @@ void CFrameRepeatDlg::OnBnClickedOpenvideo()
 afx_msg LRESULT CFrameRepeatDlg::OnCustomOpenProgress(WPARAM wParam, LPARAM lParam)
 {
 	if (m_Progress.GetSafeHwnd() != NULL) {
-		m_Progress.SetPos(wParam);
-		m_Progress.SetRange32(0, lParam);
+		m_Progress.SetPos((int)wParam);
+		m_Progress.SetRange32(0, (int)lParam);
 	}
 	if (m_ProgText.GetSafeHwnd() != NULL) {
 		TCHAR buf[1024];

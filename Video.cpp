@@ -149,14 +149,14 @@ void SmoothData(std::vector<int> & v, std::vector<double>::iterator & vals,
 		cv::setIdentity(kf.measurementNoiseCov, cv::Scalar::all(1e-1));
 		cv::setIdentity(kf.errorCovPost, cv::Scalar::all(1));
 		std::transform(v.begin(), v.end(), std::back_inserter(pcts), [vals, minmaxes, &measurement, &kf](int idx) ->
-			double { measurement.at<float>(0) = minmaxes[idx].second - minmaxes[idx].first == 0 ? 0 : (vals[idx] - minmaxes[idx].first) / (minmaxes[idx].second - minmaxes[idx].first); kf.correct(measurement); return kf.predict().at<float>(0); });
+			double { measurement.at<float>(0) = minmaxes[idx].second - minmaxes[idx].first == 0 ? 0 : (float)((vals[idx] - minmaxes[idx].first) / (minmaxes[idx].second - minmaxes[idx].first)); kf.correct(measurement); return kf.predict().at<float>(0); });
 	} else {
 		std::vector<double> normpcts;
 		int base = *v.begin();
 		std::transform(v.begin(), v.end(), std::back_inserter(normpcts), [&vals, &minmaxes, base, valbase](int idx) ->
 			double { return minmaxes[idx - base].second - minmaxes[idx - base].first == 0 ? 0 : (vals[idx - valbase] - minmaxes[idx - base].first) / (minmaxes[idx - base].second - minmaxes[idx - base].first); });
 		//window size should be configurable...
-		int sz = normpcts.size();
+		int sz = (int)normpcts.size();
 		std::transform(v.begin(), v.end(), std::back_inserter(pcts), [&normpcts, sz, base](int idx) ->
 			double { return ((idx - base >= 3 ? normpcts[idx - base - 3] : 0) + (idx - base >= 2 ? normpcts[idx - base - 2] : 0) + (idx - base >= 1 ? normpcts[idx - base - 1] : 0) + normpcts[idx - base] +
 			(idx - base + 2 <= sz ? normpcts[idx - base + 1] : 0) + (idx - base + 3 <= sz ? normpcts[idx - base + 2] : 0) + (idx - base + 4 <= sz ? normpcts[idx - base + 3] : 0)) /
@@ -167,7 +167,7 @@ void SmoothData(std::vector<int> & v, std::vector<double>::iterator & vals,
 void findFrequencyMinMax(int freq, std::vector<double> & pcts, std::set<int> & maxindexes, std::set<int> & minindexes)
 {
 	std::vector<int> peaks, troughs;
-	int sz = pcts.size();
+	int sz = (int)pcts.size();
 	for (int i = 0; i < sz; i++) {
 		//if (i > 1 && i < sz - 2 && pcts[i] > pcts[i - 2] && pcts[i] > pcts[i - 1] && pcts[i] > pcts[i + 1] && pcts[i] > pcts[i + 2]) {
 		if (i > 0 && i < sz - 1 && pcts[i] > pcts[i - 1] && pcts[i] == pcts[i + 1]) {
@@ -191,7 +191,7 @@ void findFrequencyMinMax(int freq, std::vector<double> & pcts, std::set<int> & m
 	}
 	int lasti = 0, maxlasti = 0;
 	int lastmin = 0;
-	int ps = peaks.size(); int ts = troughs.size();
+	int ps = (int)peaks.size(); int ts = (int)troughs.size();
 	if (ps == 0) return;
 	for (int i = 0; i <= ps; i++) {
 		//peak staggering, combine in trough staggering
@@ -217,7 +217,7 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 	std::vector<double> & pcts1, std::vector<double> & pcts2, std::vector<double> & pcts3,
 	std::vector<double> & finalpcts, std::set<int> & maxindexes, std::set<int> & minindexes, int windowSize)
 {
-	int ms = motionDetected.size();
+	int ms = (int)motionDetected.size();
 
 	std::vector<double> vals;
 	std::vector<int> v(windowSize == -1 ? ms : std::min(windowSize, ms));
@@ -233,7 +233,7 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 		[oscillations, oscCount](int idx) ->
 		double { return oscCount[idx] == 0 ? 0 : oscillations[idx] / oscCount[idx]; });
 	std::vector<std::pair<double, double>> minmaxes;
-	int vs = vals.size();
+	int vs = (int)vals.size();
 	int base = *v.begin() <= 25 ? 0 : *v.begin() - 25;
 	std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&vals, vs, base](int idx) ->
 		std::pair<double, double>
@@ -247,7 +247,7 @@ void calcResults(std::vector<double> & motionDetected, std::vector<double> & osc
 	//std::iota(v.begin(), v.end(), 0);
 	//std::vector<std::pair<std::vector<double>::iterator, std::vector<double>::iterator>> minmaxes;
 	minmaxes.clear();
-	vs = ft.size();
+	vs = (int)ft.size();
 	std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&ft, vs, base](int idx) ->
 		std::pair<double, double>
 	{ std::pair<std::vector<double>::iterator, std::vector<double>::iterator> minmax =
@@ -330,30 +330,31 @@ void DrawProcessor(DrawStartParams& p)
 			double dWidth = r.width; if (dWidth == -1 || dWidth == 0) dWidth = p.vi.dwWidthInPixels * 3 / 2;
 			double dHeight = r.height; if (dHeight == -1 || dHeight == 0) dHeight = p.vi.dwHeightInPixels + 150;
 
-			canvas = cv::Mat3b(dHeight, dWidth, cv::Vec3b(0, 0, 0));
+			canvas = cv::Mat3b((int)dHeight, (int)dWidth, cv::Vec3b(0, 0, 0));
 			//widthxheight, widthx60, width/2xheight/2, width/2xheight/2
-			cv::resize(di.detFrame, di.detFrame, cv::Size(p.pp.bDeployMode ? dWidth / 2 : dWidth * 2 / 3, dHeight - (p.pp.bDeployMode ? 0 : 150)), cv::INTER_CUBIC);
-			di.detFrame.copyTo(canvas(cv::Rect(0, 0, p.pp.bDeployMode ? dWidth / 2 : dWidth * 2 / 3, dHeight - (p.pp.bDeployMode ? 0 : 150))));
+			cv::resize(di.detFrame, di.detFrame, cv::Size(p.pp.bDeployMode ? (int)dWidth / 2 : (int)dWidth * 2 / 3, (int)dHeight - (p.pp.bDeployMode ? 0 : 150)), cv::INTER_CUBIC);
+			di.detFrame.copyTo(canvas(cv::Rect(0, 0, p.pp.bDeployMode ? (int)dWidth / 2 : (int)dWidth * 2 / 3, (int)dHeight - (p.pp.bDeployMode ? 0 : 150))));
 			if (!p.pp.bDeployMode) {
-				cv::resize(di.bkg, di.bkg, cv::Size(dWidth / 3, (dHeight - 150) / 2), cv::INTER_CUBIC);
-				di.bkg.copyTo(canvas(cv::Rect(dWidth * 2 / 3, 0, dWidth / 3, (dHeight - 150) / 2)));
-				cv::resize(di.fgnd, di.fgnd, cv::Size(dWidth / 3, (dHeight - 150) / 2), cv::INTER_CUBIC);
-				di.fgnd.copyTo(canvas(cv::Rect(dWidth * 2 / 3, (dHeight - 150) / 2, dWidth / 3, (dHeight - 150) / 2)));
-
-				//FPS
-				now = time(NULL);
-				sprintf(buf, "Frame: %lu", di.FrameCount);
-				baseLine = 0;
-				cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-				cv::putText(canvas, cv::String(buf), cv::Point(dWidth * 2 / 3 + (dWidth / 3 - s.width * 15 / s.height) / 2, (dHeight - 150) / 2 + 15), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
-				sprintf(buf, "Time: %lu", (int)(di.FrameCount / p.vi.dFPS));
-				s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-				cv::putText(canvas, cv::String(buf), cv::Point(dWidth * 2 / 3 + (dWidth / 3 - s.width * 15 / s.height) / 2, (dHeight - 150) / 2 + 10 + 30), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
-				sprintf(buf, "Processing FPS: %lu", now == di.start ? 0 : (di.FrameCount - di.iBaseFrame) / (int)(now - di.start));
-				s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-				cv::putText(canvas, cv::String(buf), cv::Point(dWidth * 2 / 3 + (dWidth / 3 - s.width * 15 / s.height) / 2, (dHeight - 150) / 2 + 10 + 45), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+				cv::resize(di.bkg, di.bkg, cv::Size((int)dWidth / 3, ((int)dHeight - 150) / 2), cv::INTER_CUBIC);
+				di.bkg.copyTo(canvas(cv::Rect((int)dWidth * 2 / 3, 0, (int)dWidth / 3, ((int)dHeight - 150) / 2)));
+				cv::resize(di.fgnd, di.fgnd, cv::Size((int)dWidth / 3, ((int)dHeight - 150) / 2), cv::INTER_CUBIC);
+				di.fgnd.copyTo(canvas(cv::Rect((int)dWidth * 2 / 3, ((int)dHeight - 150) / 2, (int)dWidth / 3, ((int)dHeight - 150) / 2)));
 			}
-			ms = di.motionDetected.size();
+
+			//FPS
+			now = time(NULL);
+			sprintf(buf, "Frame: %lu", di.FrameCount);
+			baseLine = 0;
+			cv::Size s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+			cv::putText(canvas, cv::String(buf), cv::Point((int)dWidth * 2 / 3 + ((int)dWidth / 3 - s.width * 15 / s.height) / 2, ((int)dHeight - 150) / 2 + 15), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+			sprintf(buf, "Time: %lu", (int)(di.FrameCount / p.vi.dFPS));
+			s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+			cv::putText(canvas, cv::String(buf), cv::Point((int)dWidth * 2 / 3 + ((int)dWidth / 3 - s.width * 15 / s.height) / 2, ((int)dHeight - 150) / 2 + 10 + 30), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+			sprintf(buf, "Processing FPS: %lu", now == di.start ? 0 : (di.FrameCount - di.iBaseFrame) / (int)(now - di.start));
+			s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
+			cv::putText(canvas, cv::String(buf), cv::Point((int)dWidth * 2 / 3 + ((int)dWidth / 3 - s.width * 15 / s.height) / 2, ((int)dHeight - 150) / 2 + 10 + 45), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+
+			ms = (int)di.motionDetected.size();
 			if (!p.pp.bDeployMode && ms != 0) {
 				dMinMax = std::minmax_element(di.motionDetected.begin(), di.motionDetected.end());
 				d = *dMinMax.second;
@@ -362,10 +363,10 @@ void DrawProcessor(DrawStartParams& p)
 				for (i = base; i < ms; i++) {
 					pct = di.motionDetected[i] / di.dMaxContourSize;
 					//timeline.at<cv::Vec3b>(cv::Point(i - base, 0)) = cv::Vec3b(pct > 0.5 ? 0 : 255 * (1 - pct * 2), 255 * (pct > 0.5 ? (pct * 2 - 1) : 1), 255);
-					cv::line(timeline, cv::Point(i - base, 0), cv::Point(i - base, 29), cv::Vec3b(pct > 0.5 ? 0 : 255 * (1 - pct * 2), 255 * (pct > 0.5 ? (pct * 2 - 1) : 1), 255));
+					cv::line(timeline, cv::Point(i - base, 0), cv::Point(i - base, 29), cv::Vec3b(pct > 0.5 ? 0 : (uchar)(255 * (1 - pct * 2)), (uchar)(255 * (pct > 0.5 ? (pct * 2 - 1) : 1)), 255));
 				}
 				//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)ms), 30), cv::INTER_MAX);
-				timeline.copyTo(canvas(cv::Rect(0, dHeight - 150, std::min((int)dWidth, (int)ms), 30)));
+				timeline.copyTo(canvas(cv::Rect(0, (int)dHeight - 150, std::min((int)dWidth, (int)ms), 30)));
 			}
 
 			if (!p.pp.bDeployMode && !p.pp.combinedGraph) {
@@ -413,18 +414,18 @@ void DrawProcessor(DrawStartParams& p)
 							cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
 							breaths++;
 						}
-						if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 29 * lastpct), cv::Point(i * dScale, 29 * pct), cv::Vec3b(255, 255, 255));
+						if (i != 0) cv::line(timeline, cv::Point((int)((i - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)(i * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
 						//timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
 						lastpct = pct;
 					}
 					//}
 					//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)(di.oscillations.size() * dScale)), 30), cv::INTER_MAX);
-					timeline.copyTo(canvas(cv::Rect(0, dHeight - 150 + 30, std::min((int)dWidth, (int)(di.oscillations.size() * dScale)), 30)));
+					timeline.copyTo(canvas(cv::Rect(0, (int)dHeight - 150 + 30, std::min((int)dWidth, (int)(di.oscillations.size() * dScale)), 30)));
 
 					sprintf(buf, "Breaths: %lu (feature points)", breaths / 2);
 					baseLine = 0;
 					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, dHeight - 150 + 30 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, (int)dHeight - 150 + 30 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
 				}
 
 				if (di.ft.size() != 0) {
@@ -448,24 +449,24 @@ void DrawProcessor(DrawStartParams& p)
 					for (i = 0; i < pcts.size(); i++) {
 						pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
 						if (maxindexes.find(i) != maxindexes.end()) {
-							cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
+							cv::line(timeline, cv::Point((int)(i * dScale), 0), cv::Point((int)(i * dScale), 30), cv::Vec3b(0, 0, 255));
 							breaths++;
 						}
 						else if (minindexes.find(i) != minindexes.end()) {
-							cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
+							cv::line(timeline, cv::Point((int)(i * dScale), 0), cv::Point((int)(i * dScale), 30), cv::Vec3b(0, 255, 0));
 							breaths++;
 						}
-						if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 29 * lastpct), cv::Point(i * dScale, 29 * pct), cv::Vec3b(255, 255, 255));
+						if (i != 0) cv::line(timeline, cv::Point((int)((i - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)(i * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
 						//timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
 						lastpct = pct;
 					}
 					//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)(di.ft.size() * dScale)), 30), cv::INTER_MAX);
-					timeline.copyTo(canvas(cv::Rect(0, dHeight - 150 + 60, std::min((int)dWidth, (int)(di.ft.size() * dScale)), 30)));
+					timeline.copyTo(canvas(cv::Rect(0, (int)dHeight - 150 + 60, std::min((int)dWidth, (int)(di.ft.size() * dScale)), 30)));
 
 					sprintf(buf, "Breaths: %lu (light intensity)", breaths / 2);
 					baseLine = 0;
 					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, dHeight - 150 + 60 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, (int)dHeight - 150 + 60 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
 				}
 
 				if (di.motionDetected.size() != 0) {
@@ -499,51 +500,56 @@ void DrawProcessor(DrawStartParams& p)
 						//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
 						//pct = log(1 + pct * (exp(1) - 1));
 						if (maxindexes.find(i) != maxindexes.end()) {
-							cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 0, 255));
+							cv::line(timeline, cv::Point((int)(i * dScale), 0), cv::Point((int)(i * dScale), 30), cv::Vec3b(0, 0, 255));
 							breaths++;
 						}
 						else if (minindexes.find(i) != minindexes.end()) {
-							cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 30), cv::Vec3b(0, 255, 0));
+							cv::line(timeline, cv::Point((int)(i * dScale), 0), cv::Point((int)(i * dScale), 30), cv::Vec3b(0, 255, 0));
 							breaths++;
 						}
-						if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 29 * lastpct), cv::Point(i * dScale, 29 * pct), cv::Vec3b(255, 255, 255));
-						timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
+						if (i != 0) cv::line(timeline, cv::Point((int)((i - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)(i * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
+						timeline.at<cv::Vec3b>(cv::Point((int)(i * dScale), (int)(29 * pct))) = cv::Vec3b(255, 255, 255);
 						lastpct = pct;
 					}
 					//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)(di.motionDetected.size() * dScale)), 30), cv::INTER_MAX);
-					timeline.copyTo(canvas(cv::Rect(0, dHeight - 150 + 90, std::min((int)dWidth, (int)(di.motionDetected.size() * dScale)), 30)));
+					timeline.copyTo(canvas(cv::Rect(0, (int)dHeight - 150 + 90, std::min((int)dWidth, (int)(di.motionDetected.size() * dScale)), 30)));
 
 					sprintf(buf, "Breaths: %lu (motion area)", breaths / 2);
 					baseLine = 0;
 					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, dHeight - 150 + 90 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, (int)dHeight - 150 + 90 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
 				}
 			} else if (ms != 0) {
 				timeline = cv::Mat::zeros(90, std::min((int)dWidth / (p.pp.bDeployMode ? 2 : 1), (int)(ms * dScale)), CV_8UC3);
 				pcts.clear(); pcts1.clear(); pcts2.clear(); pcts3.clear(); maxindexes.clear(); minindexes.clear();
-				calcResults(di.motionDetected, di.oscillations, di.oscCount, di.ft, pcts1, pcts2, pcts3, pcts, maxindexes, minindexes, std::min((int)dWidth / (p.pp.bDeployMode ? 2 : 1), (int)(ms * dScale)));
+				int procRange = std::min(std::max(60 * (int)p.pp.dDesiredFPS, (int)dWidth / (p.pp.bDeployMode ? 2 : 1)), (int)(ms * dScale));
+				calcResults(di.motionDetected, di.oscillations, di.oscCount, di.ft, pcts1, pcts2, pcts3, pcts, maxindexes, minindexes, procRange);
 				breaths = 0;
-				for (i = 0; i < std::min((int)dWidth / (p.pp.bDeployMode ? 2 : 1), (int)(ms * dScale)); i++) {
+				int b = 60 * (int)p.pp.dDesiredFPS > (int)dWidth / (p.pp.bDeployMode ? 2 : 1) &&
+					60 * (int)p.pp.dDesiredFPS <= (int)(ms * dScale) ? 60 * (int)p.pp.dDesiredFPS - (int)dWidth / (p.pp.bDeployMode ? 2 : 1) :
+					(int)dWidth / (p.pp.bDeployMode ? 2 : 1) <= (int)(ms * dScale) ? (int)(ms * dScale) - (int)dWidth / (p.pp.bDeployMode ? 2 : 1) : 0;
+				for (i = 0; i < procRange; i++) {
 					if (maxindexes.find(i) != maxindexes.end()) {
-						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 90), cv::Vec3b(0, 0, 255));
+						if (i >= b) cv::line(timeline, cv::Point((int)((i - b) * dScale), 0), cv::Point((int)((i - b) * dScale), 90), cv::Vec3b(0, 0, 255));
 						breaths++;
 					}
 					else if (minindexes.find(i) != minindexes.end()) {
-						cv::line(timeline, cv::Point(i * dScale, 0), cv::Point(i * dScale, 90), cv::Vec3b(0, 255, 0));
+						if (i >= b) cv::line(timeline, cv::Point((int)((i - b) * dScale), 0), cv::Point((int)((i - b) * dScale), 90), cv::Vec3b(0, 255, 0));
 						breaths++;
 					}
-					if (i != 0) cv::line(timeline, cv::Point((i - 1) * dScale, 89 * pcts[i - 1]), cv::Point(i * dScale, 89 * pcts[i]), cv::Vec3b(255, 255, 255));
+					if (i > b) cv::line(timeline, cv::Point((int)((i - b - 1) * dScale), (int)(89 * pcts[i - 1])), cv::Point((int)((i - b) * dScale), (int)(89 * pcts[i])), cv::Vec3b(255, 255, 255));
 					//timeline.at<cv::Vec3b>(cv::Point(i * dScale, 89 * pct)) = cv::Vec3b(255, 255, 255);
 				}
 				//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)(ms * dScale)), 90), cv::INTER_MAX);
-				timeline.copyTo(canvas(p.pp.bDeployMode ? cv::Rect(dWidth / 2, dHeight - 150 + 30, std::min((int)(dWidth / 2), (int)(ms * dScale)), 90) : cv::Rect(0, dHeight - 150 + 30, std::min((int)dWidth, (int)(ms * dScale)), 90)));
+				timeline.copyTo(canvas(cv::Rect(p.pp.bDeployMode ? (int)dWidth / 2 : 0, (int)dHeight - 150 + 30, std::min((int)dWidth / (p.pp.bDeployMode ? 2 : 1), (int)(ms * dScale)), 90)));
 
-				sprintf(buf, "Breaths: %lu", breaths / 2);
+				if (ms / (int)p.pp.dDesiredFPS <= 60) sprintf(buf, "Breaths: %lu (%lus)", breaths / 2, ms / (int)p.pp.dDesiredFPS);
+				else sprintf(buf, "Breaths: %lu", breaths / 2);
 				baseLine = 0;
 				s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-				cv::putText(canvas, cv::String(buf), 
-					p.pp.bDeployMode ? cv::Point(dWidth / 2 + ((int)dWidth / 2 - s.width * 15 / s.height) / 2, dHeight - 150 + 90 + 10) :
-					cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, dHeight - 150 + 90 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+				cv::putText(canvas, cv::String(buf), p.pp.bDeployMode ?
+					cv::Point((int)dWidth / 2 + ((int)dWidth / 2 - s.width * (p.pp.bDeployMode ? 2 : 1) * 15 / s.height) / 2, (int)dHeight - (p.pp.bDeployMode ? 150 : 0) - 150 + 90 + 10) :
+					cv::Point(((int)dWidth - s.width * (p.pp.bDeployMode ? 2 : 1) * 15 / s.height) / 2, (int)dHeight - (p.pp.bDeployMode ? 150 : 0) - 150 + 90 + 10), cv::FONT_HERSHEY_PLAIN, (p.pp.bDeployMode ? 2 : 1) * (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
 			}
 
 			p.pf(canvas, di.FrameCount);
@@ -583,7 +589,13 @@ void ResizeProcessor(ResizeStartParams& p)
 		if (!*p.pCancel && frame.dims != 0 && p.FrameCount != p.pp.iMaxFrames) {
 			if (!p.pp.noProcessing) {
 				cv::Mat detFrame = frame.clone();
-				if (p.pp.iMinHeight != 0 || p.pp.iMinWidth != 0) cv::resize(frame, frame, cv::Size(p.pp.iMinWidth, p.pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
+				if (p.pp.iMinHeight != 0 || p.pp.iMinWidth != 0) {
+					while (frame.cols / 2 >= p.pp.iMinWidth && frame.rows / 2 >= p.pp.iMinHeight) {
+						cv::pyrDown(frame, frame, cv::Size(frame.cols / 2, frame.rows / 2));
+					}
+					//cv::pyrDown(frame, frame, cv::Size(p.pp.iMinWidth, p.pp.iMinHeight));
+					cv::resize(frame, frame, cv::Size(p.pp.iMinWidth, p.pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
+				}
 				if (p.pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
 				{
 					std::lock_guard<std::mutex> lock(p.m);
@@ -607,7 +619,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 	std::vector<double> areas;
 	int UseEvery, FrameCount = 0;
 	//1440x1080 vidoes or 4:3 aspect ratio, 25fps
-	int frameHistory = pp.iCalibrationTimeWindow * pp.dDesiredFPS;
+	int frameHistory = pp.iCalibrationTimeWindow * (int)pp.dDesiredFPS;
 	if (pvc.isOpened()) {
 		bg = pp.bMOG ? (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorMOG2(frameHistory, pp.threshold, pp.bShadowDetection) : (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorKNN(frameHistory, pp.threshold, pp.bShadowDetection);
 		if (pp.bMOG) {
@@ -790,7 +802,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				//cv::calcOpticalFlowFarneback(bkgnd, frame, pyramid, 0.5, 3, 15, 3, 5, 1.2, 0);
 				double totaldist = 0, totalneg = 0;
 				int totalosc = 0, totalnegosc = 0;
-				int sz = pts.size();
+				int sz = (int)pts.size();
 				for (int i = 0; i < sz; i++) {
 					if (!status[i] || !nextstatus[i]) continue;
 					//if (err.at<float>(cv::Point(0, i)) > 2) continue;;
@@ -1042,7 +1054,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 								std::transform(contours.begin(), contours.end(), std::back_inserter(cts), [pp, &ct, vi](std::vector<cv::Point>& vec) {
 									ct.clear();
 									std::transform(vec.begin(), vec.end(), std::back_inserter(ct), [pp, vi](cv::Point& v) {
-										return cv::Point(v.x * vi.dwWidthInPixels / pp.iMinWidth, v.y * vi.dwHeightInPixels / pp.iMinHeight);
+										return cv::Point(v.x * (int)vi.dwWidthInPixels / pp.iMinWidth, v.y * (int)vi.dwHeightInPixels / pp.iMinHeight);
 									});
 									return ct;
 								});
@@ -1053,15 +1065,15 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 						if (pp.iMinHeight != 0 || pp.iMinWidth != 0) {
 							std::vector<cv::KeyPoint> kpoints;
-							std::transform(lastkps.begin(), lastkps.end(), std::back_inserter(kpoints), [&pp, &vi](cv::KeyPoint& v) { return cv::KeyPoint(cv::Point2f(v.pt.x * vi.dwWidthInPixels / pp.iMinWidth, v.pt.y * vi.dwHeightInPixels / pp.iMinHeight), v.size * vi.dwWidthInPixels / pp.iMinWidth, v.angle, v.response, v.octave, v.class_id); });
+							std::transform(lastkps.begin(), lastkps.end(), std::back_inserter(kpoints), [&pp, &vi](cv::KeyPoint& v) { return cv::KeyPoint(cv::Point2f(v.pt.x * (float)vi.dwWidthInPixels / pp.iMinWidth, v.pt.y * (float)vi.dwHeightInPixels / pp.iMinHeight), v.size * (float)vi.dwWidthInPixels / pp.iMinWidth, v.angle, v.response, v.octave, v.class_id); });
 							cv::drawKeypoints(detFrame, kpoints, detFrame);
 						}
 						else cv::drawKeypoints(detFrame, lastkps, detFrame);
-						sz = pts.size();
+						sz = (int)pts.size();
 						for (int i = 0; i < sz; i++) {
 							if (!status[i]) continue;
 							if (pp.iMinHeight != 0 || pp.iMinWidth != 0) {
-								cv::circle(detFrame, cv::Point2f(pts[i].x * vi.dwWidthInPixels / pp.iMinWidth, pts[i].y * vi.dwHeightInPixels / pp.iMinHeight), 5, cv::Scalar(255, 0, 0), 2);
+								cv::circle(detFrame, cv::Point2f(pts[i].x * (float)vi.dwWidthInPixels / pp.iMinWidth, pts[i].y * (float)vi.dwHeightInPixels / pp.iMinHeight), 5, cv::Scalar(255, 0, 0), 2);
 							}
 							else cv::circle(detFrame, pts[i], 5, cv::Scalar(255, 0, 0), 2);
 						}
@@ -1158,7 +1170,7 @@ void callbackPause(int, void* p)
 void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 {
 	double dWidth = cv::getWindowImageRect(WINDOWNAME).width; if (dWidth == -1 || dWidth == 0) dWidth = ((StartParams*)userdata)->vi.dwWidthInPixels * 3 / 2;
-	cv::Rect button(dWidth - 20, 10, 20, 60);
+	cv::Rect button((int)dWidth - 20, 10, 20, 60);
 	if (event == cv::EVENT_LBUTTONDOWN) {
 		if (!button.contains(cv::Point(x, y))) ((StartParams*)userdata)->breathPos.push_back(((StartParams*)userdata)->iCurPos);
 	} else if (event == cv::EVENT_LBUTTONUP) {
@@ -1214,7 +1226,7 @@ int main(int argc, char** argv)
 	cv::namedWindow(WINDOWNAME, (params.pp.bSaveVid ? CV_WINDOW_AUTOSIZE : CV_WINDOW_NORMAL) | CV_WINDOW_KEEPRATIO);
 	cv::VideoWriter vw;
 	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
-	if (params.vi.dFrameCount > 0) cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, params.vi.dFrameCount, ChangeVideoPos, &params);
+	if (params.vi.dFrameCount > 0) cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, (int)params.vi.dFrameCount, ChangeVideoPos, &params);
 	//cv::createButton(PAUSEBTN, callbackPause, &params, CV_PUSH_BUTTON);
 	std::thread vidProc(&VideoProcessor, std::ref(params));
 	params.start = std::chrono::high_resolution_clock::now();
@@ -1246,24 +1258,26 @@ int main(int argc, char** argv)
 			if (argc != FIRST_ARG) {
 				if (params.breathPos.size() != 0) {
 					dScale = 1;// params.pp.dDesiredFPS / params.vi.dFPS;
-					timeline = cv::Mat::zeros(30, std::min((int)mat.cols, (1 + (int)((idx - params.iBaseFrame) * dScale))), CV_8UC3);
-					iBase = -1, sz = params.breathPos.size(), basePos = std::max(0, (int)((idx - params.iBaseFrame) * dScale) - (int)mat.cols);
+					timeline = cv::Mat::zeros(30, std::min((int)mat.cols / (params.pp.bDeployMode ? 2 : 1), (1 + (int)((idx - params.iBaseFrame) * dScale))), CV_8UC3);
+					iBase = -1, sz = (int)params.breathPos.size(), basePos = std::max(0, (int)((idx - params.iBaseFrame) * dScale) - (int)mat.cols);
 					for (i = 0; i < sz; i++) {
 						if (params.breathPos[i] >= params.iBaseFrame && params.breathPos[i] <= idx) {
 							if ((params.breathPos[i] - params.iBaseFrame) * dScale < basePos) continue;
 							if (iBase == -1) iBase = i;
 							//timeline.at<cv::Vec3b>(cv::Point((params.breathPos[i] - params.iBaseFrame) * dScale, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
-							cv::line(timeline, cv::Point((params.breathPos[i] - params.iBaseFrame) * dScale - basePos, 0), cv::Point((params.breathPos[i] - params.iBaseFrame) * dScale - basePos, 29), i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255));
+							cv::line(timeline, cv::Point((params.breathPos[i] - params.iBaseFrame) * (int)dScale - basePos, 0), cv::Point((params.breathPos[i] - params.iBaseFrame) * (int)dScale - basePos, 29), i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255));
 						} else if (params.breathPos[i] > idx) break;
 					}
 					//cv::resize(timeline, timeline, cv::Size(std::min((int)params.vi.dwWidthInPixels, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30), cv::INTER_MAX);
 
-					timeline.copyTo(mat(cv::Rect(0, mat.rows - 30, std::min((int)mat.cols, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30)));
+					timeline.copyTo(mat(params.pp.bDeployMode ? cv::Rect(mat.cols / 2, mat.rows - 30, std::min((int)(mat.cols / 2), (1 + (int)((idx - params.iBaseFrame) * dScale))), 30) :
+						cv::Rect(0, mat.rows - 30, std::min((int)mat.cols, (1 + (int)((idx - params.iBaseFrame) * dScale))), 30)));
 
+					if (sz / (int)params.pp.dDesiredFPS <= 60) sprintf(buf, "Breaths: %lu (%lus)", iBase == -1 ? 0 : (i - iBase) / 2, sz / (int)params.pp.dDesiredFPS);
 					sprintf(buf, "Breaths: %lu", iBase == -1 ? 0 : (i - iBase) / 2);
 					baseLine = 0;
 					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
-					cv::putText(mat, cv::String(buf), cv::Point(((int)mat.cols - s.width * 15 / s.height) / 2, mat.rows - 30 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
+					cv::putText(mat, cv::String(buf), cv::Point((params.pp.bDeployMode ? (int)mat.cols / 2 : 0) + ((int)mat.cols / (params.pp.bDeployMode ? 2 : 1) - s.width * 15 / s.height) / 2, mat.rows - 30 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
 				}
 				cv::Rect button((int)mat.cols - 20, 10, 20, 20);
 				mat(button) = cv::Vec3b(200, 200, 200);
