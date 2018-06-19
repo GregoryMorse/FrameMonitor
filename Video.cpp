@@ -190,19 +190,22 @@ void findFrequencyMinMax(int freq, std::vector<double> & pcts, std::set<int> & m
 		}
 	}
 	int lasti = 0, maxlasti = 0;
-	int lastmin = 0;
+	int lastmin = 0, minlasti = 0;
 	int ps = (int)peaks.size(); int ts = (int)troughs.size();
 	if (ps == 0) return;
 	for (int i = 0; i <= ps; i++) {
 		//peak staggering, combine in trough staggering
 		if (peaks[maxlasti] > peaks[lasti] + freq) {
-			while (maxlasti + 1 < ps && peaks[maxlasti] <= peaks[lasti] + freq * 3 / 2 && pcts[peaks[maxlasti + 1]] > pcts[peaks[maxlasti]]) maxlasti++;
+			//first compute minimum next trough to do a double staggering
+			while (minlasti + 1 < ts && troughs[minlasti] <= troughs[lastmin] + freq && pcts[troughs[minlasti + 1]] < pcts[troughs[minlasti]]) minlasti++;
+			while (maxlasti + 1 < ps && (peaks[maxlasti] <= peaks[lasti] + freq && pcts[peaks[maxlasti + 1]] > pcts[peaks[maxlasti]] ||
+					pcts[peaks[maxlasti]] <= pcts[troughs[minlasti]])) maxlasti++;
 			maxindexes.insert(peaks[maxlasti]);
 			if (lastmin < ts && troughs[lastmin] < peaks[maxlasti]) {
 				int min;
 				for (min = lastmin; min < ts && peaks[maxlasti] > troughs[min]; min++) {}
 				minindexes.insert(*std::min_element(troughs.begin() + lastmin, troughs.begin() + min, [pcts](int& i1, int& i2) { return pcts[i1] < pcts[i2]; }));
-				lastmin = min;
+				lastmin = min; minlasti = min;
 			}
 			lasti = maxlasti; maxlasti = i;
 		}
@@ -378,8 +381,8 @@ void DrawProcessor(DrawStartParams& p)
 					//if (dMaxOsc != 0) {
 					lastpct = 0;
 					vals.clear();
-					v.resize(std::min(std::min((int)dWidth, (int)(di.oscillations.size() * dScale)), (int)di.oscillations.size()));
-					std::iota(v.begin(), v.end(), std::max(0, (int)di.oscillations.size() - std::min((int)dWidth, (int)(di.oscillations.size() * dScale))));
+					v.resize(std::min(std::min(std::max(60 * (int)p.pp.dDesiredFPS, (int)dWidth), (int)(di.oscillations.size() * dScale)), (int)di.oscillations.size()));
+					std::iota(v.begin(), v.end(), std::max(0, (int)di.oscillations.size() - std::min(std::max(60 * (int)p.pp.dDesiredFPS, (int)dWidth), (int)(di.oscillations.size() * dScale))));
 					if (*v.begin() != 0) {
 						std::vector<int> w(*v.begin() <= 25 ? *v.begin() : 25);
 						std::iota(w.begin(), w.end(), *v.begin() <= 25 ? 0 : *v.begin() - 25);
@@ -404,17 +407,20 @@ void DrawProcessor(DrawStartParams& p)
 					maxindexes.clear();
 					minindexes.clear();
 					findFrequencyMinMax(25, pcts, maxindexes, minindexes);
+					int b = 60 * (int)p.pp.dDesiredFPS > (int)dWidth &&
+						60 * (int)p.pp.dDesiredFPS <= (int)(di.oscillations.size() * dScale) ? 60 * (int)p.pp.dDesiredFPS - (int)dWidth :
+						(int)dWidth <= (int)(di.oscillations.size() * dScale) ? (int)(di.oscillations.size() * dScale) - (int)dWidth : 0;
 					for (i = 0; i < pcts.size(); i++) {
 						pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
 						if (maxindexes.find(i) != maxindexes.end()) {
-							cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 0, 255));
+							if (i >= b) cv::line(timeline, cv::Point((i - b) * 1, 0), cv::Point((i - b) * 1, 30), cv::Vec3b(0, 0, 255));
 							breaths++;
 						}
 						else if (minindexes.find(i) != minindexes.end()) {
-							cv::line(timeline, cv::Point(i * 1, 0), cv::Point(i * 1, 30), cv::Vec3b(0, 255, 0));
+							if (i >= b) cv::line(timeline, cv::Point((i - b) * 1, 0), cv::Point((i - b) * 1, 30), cv::Vec3b(0, 255, 0));
 							breaths++;
 						}
-						if (i != 0) cv::line(timeline, cv::Point((int)((i - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)(i * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
+						if (i > b) cv::line(timeline, cv::Point((int)((i - b - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)((i - b) * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
 						//timeline.at<cv::Vec3b>(cv::Point(i * 1, 29 * pct)) = cv::Vec3b(255, 255, 255);
 						lastpct = pct;
 					}
@@ -422,15 +428,16 @@ void DrawProcessor(DrawStartParams& p)
 					//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)(di.oscillations.size() * dScale)), 30), cv::INTER_MAX);
 					timeline.copyTo(canvas(cv::Rect(0, (int)dHeight - 150 + 30, std::min((int)dWidth, (int)(di.oscillations.size() * dScale)), 30)));
 
-					sprintf(buf, "Breaths: %lu (feature points)", breaths / 2);
+					if (di.oscillations.size() / (int)p.pp.dDesiredFPS <= 60) sprintf(buf, "Breaths: %lu (%lus, feature points)", breaths / 2, (int)di.oscillations.size() / (int)p.pp.dDesiredFPS);
+					else sprintf(buf, "Breaths: %lu (feature points)", breaths / 2);
 					baseLine = 0;
 					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, (int)dHeight - 150 + 30 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
 				}
 
 				if (di.ft.size() != 0) {
-					v.resize(std::min(std::min((int)dWidth, (int)(di.ft.size() * dScale)), (int)di.ft.size()));
-					std::iota(v.begin(), v.end(), std::max(0, (int)di.ft.size() - std::min((int)dWidth, (int)(di.ft.size() * dScale))));
+					v.resize(std::min(std::min(std::max(60 * (int)p.pp.dDesiredFPS, (int)dWidth), (int)(di.ft.size() * dScale)), (int)di.ft.size()));
+					std::iota(v.begin(), v.end(), std::max(0, (int)di.ft.size() - std::min(std::max(60 * (int)p.pp.dDesiredFPS, (int)dWidth), (int)(di.ft.size() * dScale))));
 					base = *v.begin();
 					minmaxes.clear();
 					std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&di](int idx) ->
@@ -446,24 +453,28 @@ void DrawProcessor(DrawStartParams& p)
 					findFrequencyMinMax(25, pcts, maxindexes, minindexes);
 					timeline = cv::Mat::zeros(30, std::min((int)dWidth, (int)(di.ft.size() * dScale)), CV_8UC3);
 					breaths = 0;
+					int b = 60 * (int)p.pp.dDesiredFPS > (int)dWidth &&
+						60 * (int)p.pp.dDesiredFPS <= (int)(di.ft.size() * dScale) ? 60 * (int)p.pp.dDesiredFPS - (int)dWidth :
+						(int)dWidth <= (int)(di.ft.size() * dScale) ? (int)(di.ft.size() * dScale) - (int)dWidth : 0;
 					for (i = 0; i < pcts.size(); i++) {
 						pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
 						if (maxindexes.find(i) != maxindexes.end()) {
-							cv::line(timeline, cv::Point((int)(i * dScale), 0), cv::Point((int)(i * dScale), 30), cv::Vec3b(0, 0, 255));
+							if (i >= b) cv::line(timeline, cv::Point((int)((i - b) * dScale), 0), cv::Point((int)((i - b) * dScale), 30), cv::Vec3b(0, 0, 255));
 							breaths++;
 						}
 						else if (minindexes.find(i) != minindexes.end()) {
-							cv::line(timeline, cv::Point((int)(i * dScale), 0), cv::Point((int)(i * dScale), 30), cv::Vec3b(0, 255, 0));
+							if (i >= b) cv::line(timeline, cv::Point((int)((i - b) * dScale), 0), cv::Point((int)((i - b) * dScale), 30), cv::Vec3b(0, 255, 0));
 							breaths++;
 						}
-						if (i != 0) cv::line(timeline, cv::Point((int)((i - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)(i * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
+						if (i > b) cv::line(timeline, cv::Point((int)((i - b - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)((i - b) * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
 						//timeline.at<cv::Vec3b>(cv::Point(i * dScale, 29 * pct)) = cv::Vec3b(255, 255, 255);
 						lastpct = pct;
 					}
 					//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)(di.ft.size() * dScale)), 30), cv::INTER_MAX);
 					timeline.copyTo(canvas(cv::Rect(0, (int)dHeight - 150 + 60, std::min((int)dWidth, (int)(di.ft.size() * dScale)), 30)));
 
-					sprintf(buf, "Breaths: %lu (light intensity)", breaths / 2);
+					if (di.ft.size() / (int)p.pp.dDesiredFPS <= 60) sprintf(buf, "Breaths: %lu (%lus, light intensity)", breaths / 2, (int)di.ft.size() / (int)p.pp.dDesiredFPS);
+					else sprintf(buf, "Breaths: %lu (light intensity)", breaths / 2);
 					baseLine = 0;
 					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, (int)dHeight - 150 + 60 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
@@ -475,8 +486,8 @@ void DrawProcessor(DrawStartParams& p)
 					//in a stable case, it depends on the sharpness of features in breathing region
 					//must filter out oscillation wave based on 2 thresholds
 					timeline = cv::Mat::zeros(30, std::min((int)dWidth, (int)(di.motionDetected.size() * dScale)), CV_8UC3);
-					v.resize(std::min(std::min((int)dWidth, (int)(di.motionDetected.size() * dScale)), (int)di.motionDetected.size()));
-					std::iota(v.begin(), v.end(), std::max(0, (int)di.motionDetected.size() - std::min((int)dWidth, (int)(di.motionDetected.size() * dScale))));
+					v.resize(std::min(std::min(std::max(60 * (int)p.pp.dDesiredFPS, (int)dWidth), (int)(di.motionDetected.size() * dScale)), (int)di.motionDetected.size()));
+					std::iota(v.begin(), v.end(), std::max(0, (int)di.motionDetected.size() - std::min(std::max(60 * (int)p.pp.dDesiredFPS, (int)dWidth), (int)(di.motionDetected.size() * dScale))));
 					base = *v.begin();
 					minmaxes.clear();
 					std::transform(v.begin(), v.end(), std::back_inserter(minmaxes), [&di](int idx) ->
@@ -492,6 +503,9 @@ void DrawProcessor(DrawStartParams& p)
 					findFrequencyMinMax(25, pcts, maxindexes, minindexes);
 					breaths = 0;
 					lastpct = 0;
+					int b = 60 * (int)p.pp.dDesiredFPS > (int)dWidth &&
+						60 * (int)p.pp.dDesiredFPS <= (int)(di.motionDetected.size() * dScale) ? 60 * (int)p.pp.dDesiredFPS - (int)dWidth :
+						(int)dWidth <= (int)(di.motionDetected.size() * dScale) ? (int)(di.motionDetected.size() * dScale) - (int)dWidth : 0;
 					for (i = 0; i < pcts.size(); i++) {
 						pct = *dMinMax.second - *dMinMax.first == 0 ? 0 : (pcts[i] - *dMinMax.first) / (*dMinMax.second - *dMinMax.first);
 						//log(exp(N) * Value) / N brings normalized value to logarithmic scale with correctly chosen N factor which is big enough to bring all values above 1
@@ -500,21 +514,22 @@ void DrawProcessor(DrawStartParams& p)
 						//pct = pct == 0 ? 0 : log(exp(10) * pct) / 10;
 						//pct = log(1 + pct * (exp(1) - 1));
 						if (maxindexes.find(i) != maxindexes.end()) {
-							cv::line(timeline, cv::Point((int)(i * dScale), 0), cv::Point((int)(i * dScale), 30), cv::Vec3b(0, 0, 255));
+							if (i >= b) cv::line(timeline, cv::Point((int)((i - b) * dScale), 0), cv::Point((int)((i - b) * dScale), 30), cv::Vec3b(0, 0, 255));
 							breaths++;
 						}
 						else if (minindexes.find(i) != minindexes.end()) {
-							cv::line(timeline, cv::Point((int)(i * dScale), 0), cv::Point((int)(i * dScale), 30), cv::Vec3b(0, 255, 0));
+							if (i >= b) cv::line(timeline, cv::Point((int)((i - b) * dScale), 0), cv::Point((int)((i - b) * dScale), 30), cv::Vec3b(0, 255, 0));
 							breaths++;
 						}
-						if (i != 0) cv::line(timeline, cv::Point((int)((i - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)(i * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
+						if (i > b) cv::line(timeline, cv::Point((int)((i - b - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)((i - b) * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
 						timeline.at<cv::Vec3b>(cv::Point((int)(i * dScale), (int)(29 * pct))) = cv::Vec3b(255, 255, 255);
 						lastpct = pct;
 					}
 					//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)(di.motionDetected.size() * dScale)), 30), cv::INTER_MAX);
 					timeline.copyTo(canvas(cv::Rect(0, (int)dHeight - 150 + 90, std::min((int)dWidth, (int)(di.motionDetected.size() * dScale)), 30)));
 
-					sprintf(buf, "Breaths: %lu (motion area)", breaths / 2);
+					if (di.motionDetected.size() / (int)p.pp.dDesiredFPS <= 60) sprintf(buf, "Breaths: %lu (%lus, motion area)", breaths / 2, (int)di.motionDetected.size() / (int)p.pp.dDesiredFPS);
+					else sprintf(buf, "Breaths: %lu (motion area)", breaths / 2);
 					baseLine = 0;
 					s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 					cv::putText(canvas, cv::String(buf), cv::Point(((int)dWidth - s.width * 15 / s.height) / 2, (int)dHeight - 150 + 90 + 10), cv::FONT_HERSHEY_PLAIN, (double)15 / s.height, cv::Scalar(255, 255, 255), 1);
@@ -1259,11 +1274,11 @@ int main(int argc, char** argv)
 				if (params.breathPos.size() != 0) {
 					dScale = 1;// params.pp.dDesiredFPS / params.vi.dFPS;
 					timeline = cv::Mat::zeros(30, std::min((int)mat.cols / (params.pp.bDeployMode ? 2 : 1), (1 + (int)((idx - params.iBaseFrame) * dScale))), CV_8UC3);
-					iBase = -1, sz = (int)params.breathPos.size(), basePos = std::max(0, (int)((idx - params.iBaseFrame) * dScale) - (int)mat.cols);
+					iBase = -1, sz = (int)params.breathPos.size(), basePos = std::max(0, (int)((idx - params.iBaseFrame) * dScale) - (int)mat.cols / (params.pp.bDeployMode ? 2 : 1));
 					for (i = 0; i < sz; i++) {
 						if (params.breathPos[i] >= params.iBaseFrame && params.breathPos[i] <= idx) {
+							if (iBase == -1 && (params.breathPos[i] - params.iBaseFrame) * dScale >= (int)((idx - params.iBaseFrame) * dScale) - 60 * (int)params.pp.dDesiredFPS) iBase = i;
 							if ((params.breathPos[i] - params.iBaseFrame) * dScale < basePos) continue;
-							if (iBase == -1) iBase = i;
 							//timeline.at<cv::Vec3b>(cv::Point((params.breathPos[i] - params.iBaseFrame) * dScale, 0)) = i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255);
 							cv::line(timeline, cv::Point((params.breathPos[i] - params.iBaseFrame) * (int)dScale - basePos, 0), cv::Point((params.breathPos[i] - params.iBaseFrame) * (int)dScale - basePos, 29), i % 2 == 0 ? cv::Vec3b(0, 255, 0) : cv::Vec3b(0, 0, 255));
 						} else if (params.breathPos[i] > idx) break;
