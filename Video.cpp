@@ -1231,14 +1231,13 @@ void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 int main(int argc, char** argv)
 {
 #ifdef _DEBUG
-	// To break at a specific leaked allocation, uncomment the line below and set
-	// the block number shown in the CRT leak report (e.g. "{12332} normal block").
-	// _CrtSetBreakAlloc(12332);
+	// Set environment variable  LEAK_BREAK=<block#>  (e.g. LEAK_BREAK=10562)
+	// to break at that CRT allocation in the debugger and see the full call
+	// stack.  Set it in Project > Properties > Debugging > Environment.
+	// Or hard-code:  _CrtSetBreakAlloc(10562);
+	if (const char* lb = getenv("LEAK_BREAK"))
+		if (long n = atol(lb)) _CrtSetBreakAlloc(n);
 
-	// Snapshot before any work so the difference only includes allocations
-	// made inside main() that survive to the return statement.
-	// Leaks from OpenCV/MSVC global state that are freed by their own static
-	// destructors will NOT appear here even though they show in the MFC dump.
 	_CrtMemState memStart;
 	_CrtMemCheckpoint(&memStart);
 #endif
@@ -1400,13 +1399,26 @@ int main(int argc, char** argv)
 	VideoCleanup((void*)params.pvc);
 	} // end of user-code scope — all stack objects destroyed here
 #ifdef _DEBUG
-	// Dump only those allocations that were made inside main() and not freed.
-	// This isolates genuine user-code leaks from OpenCV/MSVC global-state
-	// allocations that show up in the later MFC dump due to destruction order.
-	_CrtMemState memEnd, memDiff;
-	_CrtMemCheckpoint(&memEnd);
-	if (_CrtMemDifference(&memDiff, &memStart, &memEnd))
-		_CrtMemDumpAllObjectsSince(&memStart);
+	// Every user object is now destroyed (scope closed above).  Blocks
+	// still alive here are OpenCV lazy-init singletons (parallel thread
+	// pool, MSMF/DSHOW capture COM state, codec registry) freed by
+	// static destructors LATER.  MFC's auto _CrtDumpMemoryLeaks() fires
+	// in between and lists those same blocks as "Detected memory leaks!".
+	{
+		_CrtMemState memEnd, memDiff;
+		_CrtMemCheckpoint(&memEnd);
+		if (_CrtMemDifference(&memDiff, &memStart, &memEnd))
+		{
+			_CrtDbgReport(_CRT_WARN, NULL, 0, NULL,
+				"\n--- main() scope: surviving blocks ---\n");
+			_CrtMemDumpStatistics(&memDiff);
+			_CrtDbgReport(_CRT_WARN, NULL, 0, NULL,
+				"(Set LEAK_BREAK=N to identify block {N})\n---\n\n");
+		}
+		else
+			_CrtDbgReport(_CRT_WARN, NULL, 0, NULL,
+				"\n--- main() scope: 0 surviving blocks ---\n\n");
+	}
 #endif
 
 	return 0;
