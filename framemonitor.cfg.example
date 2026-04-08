@@ -1,0 +1,40 @@
+; framemonitor.cfg — FrameMonitor launch configuration
+;
+; SETUP: copy this file to framemonitor.cfg in the project root (or next to
+; the compiled executable) and uncomment exactly one active entry below.
+;
+; Lines beginning with ; or # are comments.
+; The first uncommented 'video=' or 'camera=' entry wins.
+;
+; If this file is absent or contains no active entry, a file-open dialog
+; will appear on startup so you can choose a video interactively.
+
+
+; ── Video file mode ──────────────────────────────────────────────────────────
+; Provide the full path to a video recording of the incubator.
+; Any format OpenCV can open is accepted (.mts, .mp4, .avi, .mkv, .mov, …).
+;
+; video=C:\recordings\recording1.mts
+; video=C:\recordings\recording2.mts
+
+
+; ── Live camera mode ─────────────────────────────────────────────────────────
+; Set the index of the capture device reported by your OS (0 = first camera).
+; Run the DeviceEnumerator utility (see DeviceEnumerator.h) to list devices.
+;
+; camera=0
+
+
+; ── Output directory ─────────────────────────────────────────────────────────
+; Directory where all output files are written:
+;   <videoname>.md        — detected breath positions
+;   <videoname>.sig.md    — per-frame signal data
+;   <videoname>.res.md    — computed breath rate results
+;   op<videoname>.mp4     — annotated combined output video  (if bSaveVid)
+;   sepop<videoname>.mp4  — annotated separate output video  (if bSaveVid)
+;
+; If absent, files are written relative to the current working directory,
+; which is usually the project root when running from inside Visual Studio —
+; uncomment and set this to a dedicated results folder to keep the repo clean.
+;
+; output_dir=C:\Users\YourName\Documents\FrameMonitor\results

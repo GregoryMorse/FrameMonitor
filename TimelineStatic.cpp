@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-#include "FrameRepeat.h"
+#include "FrameMonitor.h"
 #include "TimelineStatic.h"
 
 
@@ -32,7 +32,7 @@ END_MESSAGE_MAP()
 void CTimelineStatic::DrawItem(LPDRAWITEMSTRUCT lpDrawItemStruct)
 {
 	HDC hdc = CreateCompatibleDC(lpDrawItemStruct->hDC);
-	if (lpDrawItemStruct->itemAction != ODA_DRAWENTIRE) return; //ODS_DEFAULT
+	if (lpDrawItemStruct->itemAction != ODA_DRAWENTIRE) { DeleteDC(hdc); return; }
 	HBITMAP hbit = CreateCompatibleBitmap(lpDrawItemStruct->hDC, (int)m_motionDetected.size(), 1);
 	HGDIOBJ hOldBitmap = SelectObject(hdc, hbit);
 	for (int i = 0; i < m_motionDetected.size(); i++) {

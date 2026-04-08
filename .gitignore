@@ -29,6 +29,12 @@ bld/
 # Uncomment if you have tasks that create the project's static files in wwwroot
 #wwwroot/
 
+# vcpkg installed packages
+vcpkg_installed/
+
+# CMake build directory
+build/
+
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
@@ -287,3 +293,22 @@ __pycache__/
 *.odx.cs
 *.xsd.cs
 *.mp4
+
+# Video files — raw recordings are not part of the repository
+# (see "Test Data" section in README.md)
+*.mts
+*.m2ts
+*.avi
+*.mkv
+*.mov
+
+# Local launch configuration (contains machine-specific absolute paths)
+framemonitor.cfg
+
+# Application output data files produced by FrameMonitor
+# (breath positions, signal data, results, annotated video)
+*.sig.md
+*.res.md
+cap0.md
+op*.mp4
+sepop*.mp4

@@ -5,7 +5,7 @@
 #define IDM_ABOUTBOX                    0x0010
 #define IDD_ABOUTBOX                    100
 #define IDS_ABOUTBOX                    101
-#define IDD_FRAMEREPEAT_DIALOG          102
+#define IDD_FRAMEMONITOR_DIALOG          102
 #define IDR_MAINFRAME                   128
 #define IDC_OPENVIDEO                   1000
 #define IDC_VIDEOIMG                    1001

@@ -17,6 +17,7 @@
 #include <algorithm>
 #endif
 #include <mutex>
+#include <fstream>
 #include "opencv2/opencv.hpp"
 #include "opencv2/xfeatures2d.hpp"
 
@@ -24,7 +25,18 @@
 #define WINDOWNAME "VideoOscillation"
 #define PAUSEBTN "PauseBtn"
 
-//for std::map<cv::Point, ...> which is an ordered map
+// Output directory — set by FrameMonitor.cpp before calling main().
+// Empty string means current working directory (original behaviour).
+std::string g_outputDir;
+
+static std::string OutPath(const std::string& filename)
+{
+	if (g_outputDir.empty()) return filename;
+	char last = g_outputDir.back();
+	return ((last == '/' || last == '\\') ? g_outputDir : g_outputDir + "\\\\") + filename;
+}
+
+//for std::map<cv::Point, ...>
 //unordered_map more appropriate but must make a hash function like x ^ y or using boost::hash_combine to make a hash_value function
 namespace cv
 {
@@ -324,12 +336,14 @@ void DrawProcessor(DrawStartParams& p)
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
 		if (*p.pCancel) break;
+		if (cv::getWindowProperty(WINDOWNAME, cv::WND_PROP_VISIBLE) < 1)
+			break;
+		cv::Rect r = cv::getWindowImageRect(WINDOWNAME);
 		{
 			std::lock_guard<std::mutex> lock(p.m);
 			di = p.drawQueue.front();
 			p.drawQueue.pop();
 
-			cv::Rect r = cv::getWindowImageRect(WINDOWNAME);
 			double dWidth = r.width; if (dWidth == -1 || dWidth == 0) dWidth = p.vi.dwWidthInPixels * 3 / 2;
 			double dHeight = r.height; if (dHeight == -1 || dHeight == 0) dHeight = p.vi.dwHeightInPixels + 150;
 
@@ -522,7 +536,7 @@ void DrawProcessor(DrawStartParams& p)
 							breaths++;
 						}
 						if (i > b) cv::line(timeline, cv::Point((int)((i - b - 1) * dScale), (int)(29 * lastpct)), cv::Point((int)((i - b) * dScale), (int)(29 * pct)), cv::Vec3b(255, 255, 255));
-						timeline.at<cv::Vec3b>(cv::Point((int)(i * dScale), (int)(29 * pct))) = cv::Vec3b(255, 255, 255);
+						if (i >= b) timeline.at<cv::Vec3b>(cv::Point((int)((i - b) * dScale), (int)(29 * pct))) = cv::Vec3b(255, 255, 255);
 						lastpct = pct;
 					}
 					//cv::resize(timeline, timeline, cv::Size(std::min((int)dWidth, (int)(di.motionDetected.size() * dScale)), 30), cv::INTER_MAX);
@@ -609,9 +623,10 @@ void ResizeProcessor(ResizeStartParams& p)
 						cv::pyrDown(frame, frame, cv::Size(frame.cols / 2, frame.rows / 2));
 					}
 					//cv::pyrDown(frame, frame, cv::Size(p.pp.iMinWidth, p.pp.iMinHeight));
-					cv::resize(frame, frame, cv::Size(p.pp.iMinWidth, p.pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
+					//geometric resize is not a good idea except for display, for image processing stick with pyramids
+					//cv::resize(frame, frame, cv::Size(p.pp.iMinWidth, p.pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
 				}
-				if (p.pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
+				if (p.pp.bGrayScale) cvtColor(frame, frame, cv::COLOR_BGR2GRAY);
 				{
 					std::lock_guard<std::mutex> lock(p.m);
 					p.imgQueue.push(detFrame);
@@ -734,7 +749,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 			iBaseFrame = iJump;
 			*iJumpFrame = -1;
-			pvc.set(CV_CAP_PROP_POS_FRAMES, pp.noProcessing ? iJump : ((iJump > frameHistory) ? iJump - frameHistory : 0)); //CV_CAP_PROP_POS_MSEC
+			pvc.set(cv::CAP_PROP_POS_FRAMES, pp.noProcessing ? iJump : ((iJump > frameHistory) ? iJump - frameHistory : 0)); //cv::CAP_PROP_POS_MSEC
 			bg = pp.bMOG ? (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorMOG2(frameHistory, pp.threshold, pp.bShadowDetection) : (cv::Ptr<cv::BackgroundSubtractor>)cv::createBackgroundSubtractorKNN(frameHistory, pp.threshold, pp.bShadowDetection);
 			if (pp.bMOG) {
 				((cv::BackgroundSubtractorMOG2*)bg.get())->setNMixtures(pp.nMixtures);
@@ -794,7 +809,7 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 				cv::Mat detFrame = frame;// frame.clone();
 				//conversion for processing
 				//if (pp.iMinHeight != 0 || pp.iMinWidth != 0) cv::resize(frame, frame, cv::Size(pp.iMinWidth, pp.iMinHeight), 0, 0, cv::INTER_AREA); //cv::INTER_LANCZOS4, cv:INTER_LINEAR for zooming, cv::INTER_CUBIC slow for zooming, cv::INTER_AREA for shrinking
-				//if (pp.bGrayScale) cvtColor(frame, frame, CV_BGR2GRAY);
+				if (pp.bGrayScale) cvtColor(frame, frame, cv::COLOR_BGR2GRAY);
 				while (params.procImgQueue.size() == 0 && !*pCancel) {
 					std::this_thread::sleep_for(std::chrono::milliseconds(10));
 				}
@@ -860,9 +875,9 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 					//if (FrameCount == 0) { FrameCount++; continue; }
 					contours.clear();
 					mask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
-					cv::ellipse(mask, cv::Point(pp.iMinWidth / 2, pp.iMinHeight / 2), cv::Size(pp.iMinWidth / 4, pp.iMinHeight / 4), 0, 0, 360, cv::Scalar(255), CV_FILLED);
+					cv::ellipse(mask, cv::Point(pp.iMinWidth / 2, pp.iMinHeight / 2), cv::Size(pp.iMinWidth / 4, pp.iMinHeight / 4), 0, 0, 360, cv::Scalar(255), cv::FILLED);
 					cv::bitwise_and(mask, fgimg, fgimg);
-					cv::findContours(fgimg, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE); //CV_RETR_CCOMP, CV_RETR_EXTERNAL   CV_CHAIN_APPROX_NONE
+					cv::findContours(fgimg, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 					if (contours.size() != 0) {
 						areas.clear();
 						std::transform(contours.begin(), contours.end(), std::back_inserter(areas), [](std::vector<cv::Point>& v) { return cv::contourArea(v); });
@@ -875,6 +890,8 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 					else {
 						dSumContourSize = 0;
 					}
+					cv::threshold(fgimg, mask, 0, 255, cv::THRESH_BINARY);
+					dSumContourSize = cv::sum(fgimg)[0];
 					motionDetected.push_back(dSumContourSize);
 
 					//oscillations.push_back(0);
@@ -882,11 +899,11 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 
 					contourWindow.push_back(contours);
 					mask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
-					cv::drawContours(mask, contourWindow.back(), -1, cv::Scalar(1), CV_FILLED);
+					cv::drawContours(mask, contourWindow.back(), -1, cv::Scalar(1), cv::FILLED);
 					cumulativeMask += mask;
 					if (contourWindow.size() > frameHistory) {
 						mask = cv::Mat::zeros(cv::Size(pp.iMinWidth, pp.iMinHeight), CV_8UC1);
-						cv::drawContours(mask, contourWindow.front(), -1, cv::Scalar(1), CV_FILLED);
+						cv::drawContours(mask, contourWindow.front(), -1, cv::Scalar(1), cv::FILLED);
 						cumulativeMask -= mask;
 						contourWindow.erase(contourWindow.begin(), contourWindow.begin() + 1);
 					}
@@ -1053,13 +1070,13 @@ void ProcessVideo(VidInfo vi, ProcessParams pp, cv::VideoCapture & pvc, std::vec
 					{
 						bg.get()->getBackgroundImage(bkgnd);
 						cv::Mat bkg;
-						cv::cvtColor(bkgnd, bkg, pp.bGrayScale ? CV_GRAY2RGB : CV_BGR2RGB);
+						cv::cvtColor(bkgnd, bkg, pp.bGrayScale ? cv::COLOR_GRAY2RGB : cv::COLOR_BGR2RGB);
 
 						//fgnd = fgimg.clone();
-						cv::cvtColor(fgimg, fgnd, CV_GRAY2RGB);
+						cv::cvtColor(fgimg, fgnd, cv::COLOR_GRAY2RGB);
 
 						contours.clear();
-						cv::findContours(mask, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE); //CV_RETR_CCOMP, CV_RETR_EXTERNAL   CV_CHAIN_APPROX_NONE
+						cv::findContours(mask, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
 						//drawContours(mask, contours, -1, cv::Scalar(255), 2);
 
 						if (contours.size() != 0) {
@@ -1202,10 +1219,10 @@ void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 	}
 }
 
-#if defined(_WIN32) || defined(_WIN64) || defined(_WINDOWS)
-#define FIRST_ARG 0
-#else
+#if defined(HEADLESS_BUILD)
 #define FIRST_ARG 1
+#else
+#define FIRST_ARG 0
 #endif
 
 int main(int argc, char** argv)
@@ -1213,7 +1230,7 @@ int main(int argc, char** argv)
 	StartParams params = { };
 	params.pvc = new cv::VideoCapture();
 	//1440x1080 vidoes or 4:3 aspect ratio
-	std::string metaFile = (argc == FIRST_ARG) ? "cap0.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".md");
+	std::string metaFile = OutPath((argc == FIRST_ARG) ? "cap0.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".md"));
 	std::ifstream inpBreath(metaFile);
 	if (inpBreath.is_open()) {
 		std::string line;
@@ -1229,16 +1246,18 @@ int main(int argc, char** argv)
 	}
 	//CAP_MSMF which should only be compiled and also be default is broken in OpenCV 3.4.1
 	if (argc == FIRST_ARG ? params.pvc->open(0+cv::CAP_DSHOW) : params.pvc->open(argv[FIRST_ARG])) {
-		params.vi.dFPS = params.pvc->get(CV_CAP_PROP_FPS) == 0 ? 25 : params.pvc->get(CV_CAP_PROP_FPS); //0 for camera capture
-		params.vi.dFrameCount = params.pvc->get(CV_CAP_PROP_FRAME_COUNT); //-1 for camera capture
-		params.vi.dwWidthInPixels = params.pvc->get(CV_CAP_PROP_FRAME_WIDTH);
-		params.vi.dwHeightInPixels = params.pvc->get(CV_CAP_PROP_FRAME_HEIGHT);
+		params.vi.dFPS = params.pvc->get(cv::CAP_PROP_FPS) == 0 ? 25 : params.pvc->get(cv::CAP_PROP_FPS); //0 for camera capture
+		params.vi.dFrameCount = params.pvc->get(cv::CAP_PROP_FRAME_COUNT); //-1 for camera capture
+		params.vi.dwWidthInPixels = params.pvc->get(cv::CAP_PROP_FRAME_WIDTH);
+		params.vi.dwHeightInPixels = params.pvc->get(cv::CAP_PROP_FRAME_HEIGHT);
 	}
 	params.pvc->isOpened();
 	params.playbackRate = 1000;
-	params.pp = ProcessParams{ true, 200, 150, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, false, false, true, false };
+	//1440x1080, chose power of 2 divisor to avoid geometric resize e.g. 720x540, 360x270
+	params.pp = ProcessParams{ true, 720, 540, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, false, false, false, false };
+	//params.pp = ProcessParams{ true, 720, 540, -1, 10, true, 10, true, 3, 25, 0, 0, true, true, true, false, false, true, false };
 	if (params.pp.noProcessing) params.breathPos.clear();
-	cv::namedWindow(WINDOWNAME, (params.pp.bSaveVid ? CV_WINDOW_AUTOSIZE : CV_WINDOW_NORMAL) | CV_WINDOW_KEEPRATIO);
+	cv::namedWindow(WINDOWNAME, (params.pp.bSaveVid ? cv::WINDOW_AUTOSIZE : cv::WINDOW_NORMAL) | cv::WINDOW_KEEPRATIO);
 	cv::VideoWriter vw;
 	cv::setMouseCallback(WINDOWNAME, VideoMouseEvent, &params);
 	if (params.vi.dFrameCount > 0) cv::createTrackbar(TRACKBARNAME, WINDOWNAME, NULL, (int)params.vi.dFrameCount, ChangeVideoPos, &params);
@@ -1308,12 +1327,12 @@ int main(int argc, char** argv)
 				s = cv::getTextSize(cv::String(buf), cv::FONT_HERSHEY_PLAIN, 1, 1, &baseLine);
 				cv::putText(mat(button), cv::String(buf), cv::Point(0, 18), cv::FONT_HERSHEY_PLAIN, (double)60 / s.width, cv::Scalar(255, 255, 255), 2);
 
-				cvSetTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
+				cv::setTrackbarPos(TRACKBARNAME, WINDOWNAME, params.iCurPos = idx);
 			}
 			cv::imshow(WINDOWNAME, mat);
 			if (params.pp.bSaveVid) {
 				if (!vw.isOpened()) {
-					vw.open((params.pp.combinedGraph ? "op" : "sepop") + std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1),
+					vw.open(OutPath((params.pp.combinedGraph ? "op" : "sepop") + std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1)),
 						vw.fourcc('D', 'I', 'V', 'X'), params.pp.dDesiredFPS, cv::Size(mat.cols, mat.rows), true);
 					//params.pvc->get(CV_CAP_PROP_FOURCC), params.vi.dFPS, cv::Size(params.vi.dwWidthInPixels, params.vi.dwHeightInPixels)
 				}
@@ -1321,7 +1340,8 @@ int main(int argc, char** argv)
 			}
 		}
 		elapsed = std::chrono::high_resolution_clock::now() - params.start;
-		c = cvWaitKey(idx == -1 ? 1 : std::max(1, (int)(params.playbackRate * params.iCurPos / params.vi.dFPS - elapsed.count()))); if (c == 27) break;
+		c = cv::waitKey(idx == -1 ? 1 : std::max(1, (int)(params.playbackRate * params.iCurPos / params.vi.dFPS - elapsed.count())));
+		if (c == 27 || cv::getWindowProperty(WINDOWNAME, cv::WND_PROP_VISIBLE) < 1) break;
 	}
 	if (params.pp.bSaveVid) vw.release();
 	params.pc = 1;
@@ -1336,8 +1356,8 @@ int main(int argc, char** argv)
 		breathfile.close();
 	}
 	if (params.motionDetect.size() != 0) {
-		std::string metaSignalFile = (argc == FIRST_ARG) ? "cap0.sig.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".sig.md");
-		std::string metaResultFile = (argc == FIRST_ARG) ? "cap0.res.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".res.md");
+		std::string metaSignalFile = OutPath((argc == FIRST_ARG) ? "cap0.sig.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".sig.md"));
+		std::string metaResultFile = OutPath((argc == FIRST_ARG) ? "cap0.res.md" : (std::string(argv[FIRST_ARG]).substr(std::string(argv[FIRST_ARG]).find_last_of("/\\") + 1) + ".res.md"));
 		std::vector<double> pcts1, pcts2, pcts3, finalpcts;
 		std::set<int> maxindexes, minindexes;
 		calcResults(params.motionDetect, params.osc, params.oscCount, params.ft, pcts1, pcts2, pcts3, finalpcts, maxindexes, minindexes, -1);
@@ -1360,7 +1380,7 @@ int main(int argc, char** argv)
 		}
 		breathfile.close();
 	}
-	cv::destroyWindow(WINDOWNAME);
+	cv::destroyAllWindows();
 	VideoCleanup((void*)params.pvc);
 	return 0;
 }
