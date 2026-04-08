@@ -20,6 +20,9 @@
 #include <fstream>
 #include "opencv2/opencv.hpp"
 #include "opencv2/xfeatures2d.hpp"
+#ifdef _DEBUG
+#include <crtdbg.h>
+#endif
 
 #define TRACKBARNAME "Frame"
 #define WINDOWNAME "VideoOscillation"
@@ -1227,6 +1230,19 @@ void VideoMouseEvent(int event, int x, int y, int flags, void* userdata)
 
 int main(int argc, char** argv)
 {
+#ifdef _DEBUG
+	// To break at a specific leaked allocation, uncomment the line below and set
+	// the block number shown in the CRT leak report (e.g. "{12332} normal block").
+	// _CrtSetBreakAlloc(12332);
+
+	// Snapshot before any work so the difference only includes allocations
+	// made inside main() that survive to the return statement.
+	// Leaks from OpenCV/MSVC global state that are freed by their own static
+	// destructors will NOT appear here even though they show in the MFC dump.
+	_CrtMemState memStart;
+	_CrtMemCheckpoint(&memStart);
+#endif
+	{
 	StartParams params = { };
 	params.pvc = new cv::VideoCapture();
 	//1440x1080 vidoes or 4:3 aspect ratio
@@ -1382,5 +1398,16 @@ int main(int argc, char** argv)
 	}
 	cv::destroyAllWindows();
 	VideoCleanup((void*)params.pvc);
+	} // end of user-code scope — all stack objects destroyed here
+#ifdef _DEBUG
+	// Dump only those allocations that were made inside main() and not freed.
+	// This isolates genuine user-code leaks from OpenCV/MSVC global-state
+	// allocations that show up in the later MFC dump due to destruction order.
+	_CrtMemState memEnd, memDiff;
+	_CrtMemCheckpoint(&memEnd);
+	if (_CrtMemDifference(&memDiff, &memStart, &memEnd))
+		_CrtMemDumpAllObjectsSince(&memStart);
+#endif
+
 	return 0;
 }

@@ -63,6 +63,8 @@ std::map<int, Device> DeviceEnumerator::getDevicesMap(const GUID deviceClass)
 			// If still fails, continue with next device
 			if (FAILED(hr)) {
 				VariantClear(&var);
+				pPropBag->Release();
+				pMoniker->Release();
 				continue;
 			}
 			// Convert to string
@@ -76,6 +78,8 @@ std::map<int, Device> DeviceEnumerator::getDevicesMap(const GUID deviceClass)
 			hr = pPropBag->Read(L"DevicePath", &var, 0);
 			if (FAILED(hr)) {
 				VariantClear(&var);
+				pPropBag->Release();
+				pMoniker->Release();
 				continue; // If it fails we continue with next device
 			}
 			else {
@@ -90,6 +94,9 @@ std::map<int, Device> DeviceEnumerator::getDevicesMap(const GUID deviceClass)
 			currentDevice.devicePath = devicePath;
 			deviceMap[deviceId] = currentDevice;
 
+			VariantClear(&var);
+			pPropBag->Release();
+			pMoniker->Release();
 		}
 		pEnum->Release();
 	}
