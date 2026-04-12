@@ -1,11 +1,15 @@
 # FrameMonitor
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![SZTAKI Repository](https://img.shields.io/badge/SZTAKI-eprint%209608-blue)](https://eprints.sztaki.hu/9608/)
+
 **Video-based Respiration Monitoring of Newborn Babies** — a Windows desktop application
-implementing the method presented at the
-[Ninth Hungarian Conference on Computer Graphics and Geometry (HCCGG'18), Budapest, 2018](https://eprints.sztaki.hu/9608/1/Morse_209_30380005_ny.pdf).
+implementing the method presented at
+[Grafgeo 2018 — Ninth Hungarian Conference on Computer Graphics and Geometry (HCCGG'18), Budapest, March 22, 2018](https://eprints.sztaki.hu/9608/1/Morse_209_30380005_ny.pdf)
+([conference program](http://cg.iit.bme.hu/~szirmay/program2.pdf)).
 
 > **Repository scope:** This repository contains **Gregory Morse's implementation only**.
-> The paper was co-authored with Dmitry Chetverikov and Daniel Egyed, whose independent
+> The paper was co-authored with Dmitrij Csetverikov and Dániel Egyed, whose independent
 > implementations were developed separately and have not been publicly released.
 
 ## Authors
@@ -13,10 +17,10 @@ implementing the method presented at the
 The paper was co-authored by:
 
 | Name | Affiliation | Contact |
-|------|-------------|---------|
+|------|-------------|---------|  
 | Gregory Morse | Eötvös Loránd University (ELTE), Budapest | gregory.morse@live.com |
-| Dmitry Chetverikov | Institute for Computer Science and Control (SZTAKI), Budapest | csetverikov@sztaki.hu |
-| Daniel Egyed | ELTE / SZTAKI | — |
+| Dmitrij Csetverikov | Institute for Computer Science and Control (SZTAKI), Budapest | csetverikov@sztaki.hu |
+| Dániel Egyed | ELTE / SZTAKI | — |
 
 Code in this repository was written by Gregory Morse.
 
@@ -166,13 +170,27 @@ appropriate institutional ethics approval should contact the corresponding autho
 
 If you use this code in academic work, please cite the original paper:
 
+> Gregory Morse, Dmitrij Csetverikov, Dániel Egyed. **Video-based Respiration Monitoring
+> of Newborn Babies: a Feasibility Study.** In: *IX. magyar számítógépes grafika és
+> geometria konferencia, GRAFGEO 2018*. Neumann János Számítógép-tudományi Társaság
+> (NJSZT), Budapest, 2018, pp. 209–215. ISBN 978-963-313-282-1.  
+> [Paper](https://eprints.sztaki.hu/9608/1/Morse_209_30380005_ny.pdf) ·
+> [Program](http://cg.iit.bme.hu/~szirmay/program2.pdf) ·
+> [SZTAKI Repository](https://eprints.sztaki.hu/9608/)
+
+> **Note:** No DOI was assigned to this proceedings volume.
+
 ```bibtex
 @inproceedings{morse2018videobased,
   title     = {Video-based Respiration Monitoring of Newborn Babies: a Feasibility Study},
-  author    = {Morse, Gregory and Chetverikov, Dmitry and Egyed, Daniel},
-  booktitle = {Proceedings of the Ninth Hungarian Conference on Computer Graphics and Geometry (HCCGG'18)},
+  author    = {Morse, Gregory and Csetverikov, Dmitrij and Egyed, D{\'a}niel},
+  booktitle = {IX. magyar sz{\'a}m{\'\i}t{\'o}g{\'e}pes grafika {\'e}s geometria konferencia, GRAFGEO 2018},
   year      = {2018},
+  month     = mar,
+  pages     = {209--215},
+  publisher = {Neumann J{\'a}nos Sz{\'a}m{\'\i}t{\'o}g{\'e}p-tudom{\'a}nyi T{\'a}rsas{\'a}g (NJSZT)},
   address   = {Budapest, Hungary},
+  isbn      = {978-963-313-282-1},
   url       = {https://eprints.sztaki.hu/9608/1/Morse_209_30380005_ny.pdf}
 }
 ```
